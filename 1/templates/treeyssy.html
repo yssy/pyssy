@@ -1,0 +1,25 @@
+﻿<html>
+<head>
+<meta HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8">
+<link rel=stylesheet type=text/css href='https://bbs.sjtu.edu.cn/file/bbs/bbs.css'>
+<script type="text/javascript" src="https://bbs.sjtu.edu.cn/check.js"></script>
+<link rel=stylesheet type=text/css href='https://bbs.sjtu.edu.cn//file/bbs/blue.css'>
+<title>饮水思源 - 同主题树状结构 [讨论区: {{article.board}}] [主题 '{{article.title}}']</title>
+</head>
+<body>
+<center><font class="title">饮水思源 - 同主题树状结构　　</font>[讨论区: {{article.board}}] [主题 '{{article.title}}']<hr>
+<table width=800>
+<tr bgcolor=e8e8e8><td>日期<td>作者<td>标题<tr>
+
+{{threads | safe}}
+</table>
+共找到 {{count}} 篇
+<a href=https://bbs.sjtu.edu.cn/bbsdoc?board={{article.board}}>本讨论区</a>
+<p>本次查询使用时间 {{time}} 秒。</p>
+
+{% for category, msg in get_flashed_messages(with_categories=true) %}
+  <p class=flash-{{ category }}>{{ msg }}</p>
+{% endfor %}
+
+</body>
+</html>
