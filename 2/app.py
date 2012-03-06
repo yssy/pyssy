@@ -200,11 +200,11 @@ def article(url):
     _links_index = [5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25]
     _links = [_body.contents[_x] for _x in _links_index]
     links = []
-    for link in _links:
+    for _link in _links:
         links.append({
-            u'url' : link[u'href'],
-            u'string' : link.string,
-            u'action' : re.findall(u'^(\w*)',link[u'href'])[0],
+            u'url' : _link[u'href'],
+            u'string' : _link.string,
+            u'action' : re.findall(u'^(\w*)',_link[u'href'])[0],
             })
     
     _content = _body.table.tr.pre #<pre>content</pre>
