@@ -1,29 +1,41 @@
 # -*- coding: utf-8 -*-
+try:
+    # try to load sae to test are we on sina app engine
+    import sae
 
-import sys
-reload(sys)
-sys.setdefaultencoding('utf-8')
+    # reload sys to use utf-8 as default encoding
+    import sys
+    reload(sys)
+    
+    sys.setdefaultencoding('utf-8')
+    import pylibmc
+    import sae
+    import sae.core
+    
+    PYSSY_SAE = True
+except:
+    PYSSY_SAE = False
+
 
 import json, re
 from datetime import datetime
 
 
 from BeautifulSoup import BeautifulSoup as BS
-import MySQLdb
+
 from flask import (Flask, g, request, abort, redirect,
                    url_for, render_template, Markup, flash)
-from jinja2 import escape
+
+from dict2xml import dict2xml
 
 app = Flask(__name__)
 app.debug = True
 
-import sae.core,sae
-import pylibmc
-
 @app.before_request
 def before_request():
-    appinfo = sae.core.Application()
-    g.mc = pylibmc.Client()
+    if PYSSY_SAE:
+        appinfo = sae.core.Application()
+        g.mc = pylibmc.Client()
     
 
 @app.teardown_request
@@ -34,13 +46,11 @@ def teardown_request(exception):
 
 @app.route('/')
 def hello():
-    html= """
+    html= u"""
         <p>欢迎使用pyssy工具。</p>
         <p>请将水源的网址中http://bbs.sjtu.edu.cn/ 替换为 http://pyssy.sinasae.com/&lt;service&gt;/ </p>
         <p>目前支持的service有： tree —— 树状主题列表</p>
-        <p>%s</p>
-        <p>%s</p>
-        """ %( str(dir(sae)) , str(dir(sae.conf)))
+        """ 
     return render_template('template.html',body=html)
 
 
@@ -53,9 +63,9 @@ URLTHREADFIND="bbstfind"
 
 import re
 
-def fetch(url,mc=True):
+def fetch(url, mc=True):
     from urllib2 import urlopen
-    if mc:
+    if mc and hasattr(g,'mc'):
         if not g.mc.get(url.encode('ascii')):
             html=urlopen(url).read().decode("gbk","ignore")
             g.mc.set(url.encode('ascii'),html)
@@ -182,12 +192,48 @@ def soupdump(var):
     else:
         return unicode(var)
 
-@app.route('/api/article/<path:url>')
-@app.route('/api/article')
-def article(url):
-    # Underscope is not in resulted json
-    _url = request.url
+@app.route(u'/api/article/<board>/<file_>', methods=[u'GET', u'POST'])
+def rest_article(board, file_):
+    ext = file_[file_.rindex(u'.')+1:]
+    if ext in [u'json', u'xml']:
+        format = ext
+        file_ = file_[:file_.rindex(u'.')]
+    else:
+        format = 'json'
+    url = u'bbscon?board=%s&file=%s'%(board, file_)
+    return article(url, format)
+    
+@app.route(u'/api/article', methods=[u'GET', u'POST'])
+def api_article():
+    if 'url' in request.values:
+        url = request.values[u'url']
+    else:
+        file_ = request.values[u'file']
+        board = request.values[u'board']
+        url = u'bbscon?board=%s&file=%s'%(board, file_)
+    format = request.values['format']
+    if 'pretty' in request.values:
+        pretty = int(request.values['pretty']) == 1
+    else:
+        pretty = False
+    return article(url, format, pretty)
+
+@app.route('/article/<path:url>', methods=['GET', 'POST'])
+@app.route('/article', methods=['GET', 'POST'])
+def url_article(url):
+    url = request.url
+    if 'format' in request.values:
+        format = request.values['format']
+    else:
+        format = 'json'
+    return article(url, format)
+
+def article(_url, _format, _pretty=False):
+    if not _format in ['json', 'xml']:
+        return 'Format "%s" not supported! Use "json" or "xml".'%_format
+
     _url = _url[_url.rfind(u'/') + 1:]
+    # Underscope is not in resulted json
     _html = fetch(URLBASE + _url)
     _soup = BS(_html)
     
@@ -197,8 +243,8 @@ def article(url):
     _board_str = _body.contents[2] # "[讨论区: BOARD]"
     board = _board_str[_board_str.rfind(':') + 2 : -1 ]
     
-    _links_index = [5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25]
-    _links = [_body.contents[_x] for _x in _links_index]
+    _link_index = [5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25]
+    _links = [_body.contents[_x] for _x in _link_index]
     links = []
     for _link in _links:
         links.append({
@@ -208,8 +254,6 @@ def article(url):
             })
     
     _content = _body.table.tr.pre #<pre>content</pre>
-    #author = _content.a
-    
     _content_raw = unicode(_content)[5:-6]
     content_lines = _content_raw.split(u'\n')
     _datetime_str = unicode(content_lines[2])[11:30]
@@ -224,12 +268,11 @@ def article(url):
     _datetime = datetime(*_datetime_list)
     
     _from_index = -1
-    for i in range(len(content_lines)-1,-1,-1):
+    for i in range(len(content_lines)-1, -1, -1):
         if len(re.findall(u'\[FROM: ([\w\.]*)\]',content_lines[i])) > 0:
             _from_index = i
         
     _from_lines = filter(lambda x:x != '',content_lines[_from_index:])
-    #return repr(_from_lines)
     _from_ip = re.findall(u'\[FROM: ([\w\.]*)\]',_from_lines[0])[0]
     _edit_times = len(_from_lines) - 1 # 来自那行,和最后</font>的一行
     
@@ -243,22 +286,23 @@ def article(url):
     else:
         _qmd_lines = []
     
-    _response_index = -1
+    _reply_index = -1
     for i in range(_qmd_index, -1, -1):
         if len(re.findall(u'^【 在.*的大作中提到: 】$',content_lines[i])) > 0:
-            _response_index = i
+            _reply_index = i
             break
-    if _response_index == -1:
-        _response_index = _qmd_index
-    if _response_index != -1:
-        _response_lines = content_lines[_response_index:_qmd_index - 1] 
-        for i in range(1,len(_response_lines)):
-            if len(re.findall(u'<font color="808080">: (.*)$',_response_lines[i])) > 0:
-                _response_lines[i] = re.findall(u'<font color="808080">: (.*)$',_response_lines[i])[0]
+    if _reply_index == -1:
+        _reply_index = _qmd_index
+    if _reply_index != -1:
+        _reply_lines = content_lines[_reply_index : _qmd_index - 1] 
+        for i in range(1,len(_reply_lines)):
+            if len(re.findall(u'<font color="808080">: (.*)$',_reply_lines[i])) > 0:
+                _reply_lines[i] = re.findall(
+                    u'<font color="808080">: (.*)$',_reply_lines[i])[0]
     else:
-        _response_lines = []
+        _reply_lines = []
         
-    _text_lines = content_lines[4:_response_index]
+    _text_lines = content_lines[4:_reply_index]
     
     content = {
         u'author': _content.a ,
@@ -270,19 +314,37 @@ def article(url):
         u'qmd_lines' : _qmd_lines ,
         u'from_lines' : _from_lines ,
         u'from_ip' : _from_ip ,
-        u'response_lines' : _response_lines,
+        u'reply_lines' : _reply_lines,
         u'text_lines' : _text_lines,
         u'edit_times' : _edit_times, 
     }
     
     del i
-    del url
     ls = locals()
     result = {}
     for key in ls:
         if key.startswith('_'): continue
         result[key] = soupdump(ls[key])
-        
-    return json.dumps( result, ensure_ascii = False, sort_keys=True, indent=4)
-    #return content.text
+     
+    if _format == 'xml':
+        xml_list_names= {
+            'qmd_lines': 'line', 
+            'content_lines': 'line',
+            'text_lines': 'line',
+            'reply_lines': 'line', 
+            'from_lines': 'line',
+            'datetime_list': 'int',
+            'links': 'link',
+        }
+        return dict2xml(result, roottag='article',
+            listnames=xml_list_names, pretty=_pretty)
+    else:
+        if _pretty:
+            return json.dumps(result, ensure_ascii = False, sort_keys=True, indent=4)
+        else:
+            return json.dumps(result, ensure_ascii = False)
+
+
+if __name__ == '__main__':
+    app.run()
 #########################################################################
