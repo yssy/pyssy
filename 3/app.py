@@ -195,13 +195,21 @@ def soupdump(var):
 @app.route(u'/api/article/<board>/<file_>', methods=[u'GET', u'POST'])
 def rest_article(board, file_):
     ext = file_[file_.rindex(u'.')+1:]
-    if ext in [u'json', u'xml']:
+    if ext in [u'json', u'xml', u'jsonp']:
         format = ext
         file_ = file_[:file_.rindex(u'.')]
     else:
         format = 'json'
+    if 'pretty' in request.values:
+        pretty = int(request.values['pretty']) == 1
+    else:
+        pretty = False
+    if 'callback' in request.values:
+        callback = request.values['callback']
+    else:
+        callback = 'callback' 
     url = u'bbscon?board=%s&file=%s'%(board, file_)
-    return article(url, format)
+    return article(url, format, pretty, callback)
     
 @app.route(u'/api/article', methods=[u'GET', u'POST'])
 def api_article():
@@ -216,7 +224,11 @@ def api_article():
         pretty = int(request.values['pretty']) == 1
     else:
         pretty = False
-    return article(url, format, pretty)
+    if 'callback' in request.values:
+        callback = request.values['callback']
+    else:
+        callback = 'callback' 
+    return article(url, format, pretty, callback)
 
 @app.route('/article/<path:url>', methods=['GET', 'POST'])
 @app.route('/article', methods=['GET', 'POST'])
@@ -226,10 +238,18 @@ def url_article(url):
         format = request.values['format']
     else:
         format = 'json'
-    return article(url, format)
+    if 'callback' in request.values:
+        callback = request.values['callback']
+    else:
+        callback = 'callback' 
+    if 'pretty' in request.values:
+        pretty = int(request.values['pretty']) == 1
+    else:
+        pretty = False
+    return article(url, format, pretty, callback)
 
-def article(_url, _format, _pretty=False):
-    if not _format in ['json', 'xml']:
+def article(_url, _format, _pretty=False, _callback='callback'):
+    if not _format in ['json', 'xml', 'jsonp']:
         return 'Format "%s" not supported! Use "json" or "xml".'%_format
 
     _url = _url[_url.rfind(u'/') + 1:]
@@ -340,9 +360,14 @@ def article(_url, _format, _pretty=False):
             listnames=xml_list_names, pretty=_pretty)
     else:
         if _pretty:
-            return json.dumps(result, ensure_ascii = False, sort_keys=True, indent=4)
+            _json_result = json.dumps(result,
+                ensure_ascii = False, sort_keys=True, indent=4)
         else:
-            return json.dumps(result, ensure_ascii = False)
+            _json_result = json.dumps(result, ensure_ascii = False)
+        if _format == 'jsonp':
+            return '%s(%s);'%(_callback, _json_result)
+        else:
+            return _json_result
 
 
 if __name__ == '__main__':
