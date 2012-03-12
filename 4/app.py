@@ -438,8 +438,8 @@ def api_board():
         callback = '' 
     return board(url, format=format, pretty=pretty, callback=callback)
 
-@app.route('/board/<path:url>', methods=['GET', 'POST'])
-@app.route('/board', methods=['GET', 'POST'])
+@app.route(u'/board/<path:url>', methods=[u'GET', u'POST'])
+@app.route(u'/board', methods=[u'GET', u'POST'])
 def url_board(url):
     url = request.url
     if 'format' in request.values:
