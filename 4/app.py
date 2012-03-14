@@ -501,21 +501,21 @@ def board(url, *args, **kwargs):
     
     html = fetch(URLBASE + url, mc=False)
     soup = BS(html)
-   
-    body = soup.body
-    result[u'board'] = body(u'input', type=u'hidden')[0][u'value']
-    table = body(u'table')
-    title = table[0].tr.font.b.string
+    result[u'board'] = soup.body(u'input', type=u'hidden')[0][u'value']
+    title = soup.body.table.tr.font.b.string
     result[u'title'] = title
     result[u'chinese_title'] = re.findall('\(.*\)$', title)[0][1:-1]
     
-    result[u'wiki'] = table[0].tr.a[u'href']
+    result[u'wiki'] = soup.body.table.tr.a[u'href']
+    
+    nobr = soup.nobr
+    
     
     links_bms_line = [{
         u'text':unicode(a.string), 
         u'href':a[u'href'], 
         u'action':re.findall(u'^(\w*)',a[u'href'])[0]} 
-            for a in table[1](u'a')]
+            for a in nobr.table(u'a')]
     
     result[u'bms'] = [bm[u'text'] for bm in 
         filter( lambda x:x[u'href'].startswith(u'bbsqry?userid='), 
@@ -539,16 +539,22 @@ def board(url, *args, **kwargs):
     else:
         result[u'page'] = 0
     
-    
-    bm_words = [child for child in table[3].tr.td][2:]
-    result[u'bm_words'] ={ 
-        u'plain': u''.join(
-            filter(lambda x:x != None,(x.string for x in bm_words))),
-        u'color': u''.join(unicode(x) for x in bm_words)}
-    district = table[3].parent.parent(u'td', align='right')[0].string
+    table2 = nobr.contents[3].tr.contents
+
+    if table2[0].string == None:
+        bm_words = [child for child in table2[0].table.tr.td][2:]
+        result[u'bm_words'] ={ 
+            u'plain': u''.join(
+                filter(lambda x:x != None,(x.string for x in bm_words))),
+            u'color': u''.join(unicode(x) for x in bm_words)}
+    else:
+        result[u'bm_words'] ={u'plain': u'',u'color': u''}
+
+    district = table2[1].string
     result[u'district'] = {u'name':district, u'char':district[0]}
+    #return ({u'r':[unicode(x) for x in nobr.contents]},{},u'debug')
     
-    articles = [tr for tr in table[5]][3:] # 前面三项是\n, 标题, \n
+    articles = [tr for tr in nobr.contents[6].table][3:] # 前面三项是\n, 标题, \n
     result[u'articles'] = []
     result[u'fixed_articles'] = []
     for art in articles:
@@ -589,7 +595,7 @@ def board(url, *args, **kwargs):
             del article[u'id']
             result[u'fixed_articles'].append(article)
     
-    tables = [tab for tab in table[6:]]
+    tables = [tab for tab in nobr.contents[6]('table')[1:]]
     result[u'other_tables'] = []
 
     for tab in tables:
@@ -609,7 +615,7 @@ def board(url, *args, **kwargs):
     
     down_links = [ ]
     after_hr = False
-    for tag in soup.nobr.contents:
+    for tag in nobr.contents:
         if not hasattr(tag, u'name'): continue
         if tag.name == u'hr':
             after_hr = True 
