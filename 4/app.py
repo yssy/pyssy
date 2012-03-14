@@ -343,11 +343,14 @@ def article(url, *args, **kwargs):
     
     from_index = -1
     for i in range(len(content_lines)-1, -1, -1):
-        if len(re.findall(u'\[FROM: ([\w\.]*)\]',content_lines[i])) > 0:
+        if len(re.findall(u'\[FROM: ([\w\.:]*)\]',content_lines[i])) > 0:
             from_index = i
         
     from_lines = filter(lambda x:x != '',content_lines[from_index:])
-    from_ip = re.findall(u'\[FROM: ([\w\.]*)\]',from_lines[0])[0]
+    if len(from_lines)>0:
+        from_ip = re.findall(u'\[FROM: ([\w\.:]*)\]',from_lines[0])[0]
+    else:
+        from_ip = ''
     edit_times = len(from_lines) - 1 # 来自那行,和最后</font>的一行
     
     qmd_index = -1

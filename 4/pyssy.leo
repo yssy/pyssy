@@ -11,7 +11,7 @@
 <find_panel_settings/>
 <vnodes>
 <v t="farseerfc.20120305201055.1131" a="E"><vh>@auto app.py</vh></v>
-<v t="farseerfc.20120310041001.1136" a="E"><vh>@auto dict2xml.py</vh></v>
+<v t="farseerfc.20120310041001.1136"><vh>@auto dict2xml.py</vh></v>
 </vnodes>
 <tnodes>
 </tnodes>
