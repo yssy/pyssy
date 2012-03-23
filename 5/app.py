@@ -641,6 +641,74 @@ def board(url, *args, **kwargs):
     return (result, xml_map, u'board')
 
 
+@app.route(u'/api/thread/<board>/<file_>', methods=[u'GET', u'POST'])
+def rest_thread(board, reid):
+    ext = reid[reid.rindex(u'.')+1:]
+    if ext in [u'json', u'xml', u'jsonp']:
+        format = ext
+        reid = reid[:reid.rindex(u'.')]
+    else:
+        format = 'json'
+    if 'pretty' in request.values:
+        pretty = int(request.values['pretty']) == 1
+    else:
+        pretty = False
+    if 'callback' in request.values:
+        callback = request.values['callback']
+        if format == 'json':
+            format = 'jsonp'
+    else:
+        callback = '' 
+    url = u'bbstfind0?board=%s&reid=%s'%(board, reid)
+    return thread(url, format=format, pretty=pretty, callback=callback)
+    
+@app.route('/thread/<path:url>', methods=['GET', 'POST'])
+@app.route('/thread', methods=['GET', 'POST'])
+def url_thread(url):
+    url = request.url
+    if 'format' in request.values:
+        format = request.values['format']
+    else:
+        format = 'json'
+    if 'callback' in request.values:
+        callback = request.values['callback']
+    else:
+        callback = '' 
+    if 'pretty' in request.values:
+        pretty = int(request.values['pretty']) == 1
+    else:
+        pretty = False
+    url = url[url.rfind(u'/') + 1:]
+    return thread(url, format=format, pretty=pretty, callback=callback)
+
+@app.route(u'/api/thread', methods=[u'GET', u'POST'])
+def api_thread():
+    if 'url' in request.values:
+        url = request.values[u'url']
+    else:
+        reid = request.values[u'reid']
+        board = request.values[u'board']
+        url = u'bbstfind0?board=%s&reid=%s'%(board, reid)
+    if 'format' in request.values:
+        format = request.values['format']
+    else:
+        format = 'json'
+    if 'pretty' in request.values:
+        pretty = int(request.values['pretty']) == 1
+    else:
+        pretty = False
+    if 'callback' in request.values:
+        callback = request.values['callback']
+    else:
+        callback = '' 
+    url = url[url.rfind(u'/') + 1:]
+    return thread(url, format=format, pretty=pretty, callback=callback)
+
+@api
+def thread(url, *args, **kwargs):
+    result = {}
+    
+    return (result,{},u'thread')
 if __name__ == '__main__':
     app.run()
 #########################################################################
