@@ -205,7 +205,7 @@ def soupdump(var):
 def api(func, *args, **kwargs):
     format, pretty, callback = kwargs['format'], kwargs['pretty'], kwargs['callback']
     del kwargs['format'], kwargs['pretty'], kwargs['callback']
-    if not format in [u'json', u'xml', u'jsonp']:
+    if not format in [u'json', u'xml', u'jsonp', u'raw']:
         return u'Format "%s" not supported! Use "json" or "xml".'%format
     if format == u'json' and callback != u'':
         format = u'jsonp'
@@ -225,8 +225,10 @@ def api(func, *args, **kwargs):
     }
     
     result = soupdump(result)
-
-    if format == u'xml':
+    
+    if format == u'raw':
+        return result
+    elif format == u'xml':
         return Response(dict2xml(result, roottag=roottag,
             listnames=xml_list_names, pretty=pretty), content_type=u'text/xml')
     else:
