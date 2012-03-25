@@ -1,0 +1,23 @@
+﻿<table border="1" style="margin_left: 20px;">
+    <tr>
+        <th valign="top"><a name="art{{article.index}}">{{article.index}}楼</a></th>
+        <td>
+        <b>作者</b><a href="{{baseurl + article.content.author_link}}">{{article.content.author}}</a>
+        <b>时间</b>{{article.content.datetime_ctime}}
+        <b>回复</b>{{replies | length}}
+        <b>score</b> {{article.score}}
+        </td>
+    </tr>
+    <tr>
+        <th valign="top"><a href="{{baseurl + article.url}}">原文</a></th>
+        <td>
+            <pre>{{content_lines | safe}}</pre>
+        </td>
+    </tr>
+    {% for reply in replies %}
+    <tr>
+        <th valign="top"><a href="#art{{article.index}}">回{{article.index}}楼</a></th>
+        <td>{{reply | safe}}</td>
+    </tr>
+    {% endfor %}
+</table>

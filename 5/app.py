@@ -78,113 +78,6 @@ def fetch(url, mc=True):
     else:
         return urlopen(url).read().decode("gbk","ignore")
 
-def escape_html(html):
-    return Markup.escape(html)
-
-class Article:
-    def __init__(self,url):
-        self.url=url
-        self.html=fetch(url)
-        self.parse()
-        
-    def parse(self):
-        self.board=re.findall(": (\w+?)]<hr>\\[<a href=bbsfwd",self.html)[0]
-        self.content=re.findall("<pre>(.*)<\/pre>",self.html,re.M|re.S)[0]
-        self.lines=self.content.split("\n")
-        self.head="\n".join(self.lines[0:3])
-        self.title=self.lines[1][6:]
-        self.author=re.findall("<a href=\"bbsqry\\?userid=(\w+)\">\\1<\/a>",self.lines[0])[0]
-        self.date=self.lines[2][9:]
-        
-        self.article=self.lines[3:]
-        self.mainlines=set()
-        self.reflines=set()
-        for line in self.article:
-            refline=re.findall("<font color=\"808080\">: (.*)$",line)
-            if len(refline)>0:
-                self.reflines.add(refline[0])
-                self.mainlines.add(": "+refline[0])
-            else:
-                self.mainlines.add(line)
-              
-    def __str__(self):
-        return "%s\t%s\t%s\n"%(self.author,self.date,self.title)
-        
-    def __repr__(self):
-        return str(self)
-        
-    def getThread(self):
-        #msg=LineMsg("Building Threads")
-        self.threadPageUrl=re.findall("\[<a href='bbstfind0\?(.+?)'>",
-            self.html,re.M|re.S)[0]
-        return getThread(URLTHREAD+self.threadPageUrl)
-
-def getThread(threadPageUrl):
-    threadPage=fetch(threadPageUrl,mc=False)
-    threadListHtml=re.findall("<table.*?>(.*?)<\/table>",threadPage,re.M|re.S)[0]
-    threadList=threadListHtml.split("<tr>")[1:]
-    threadUrlList=[URLARTICLE+re.findall("<a href=bbscon\?(.+?)>",sub)[0]
-        for sub in threadList]
-    return [Article(url) for url in threadUrlList]
-
-def getArticleUrl(url):
-    html=fetch(url)
-    articleUrl=re.findall("</a>\]\[<a href='bbscon\?(.+?)'>",html,re.M|re.S)[0]
-    return "bbscon?"+articleUrl
-
-def calcRef(threads):
-    for art in threads:
-        max_score=0
-        max_refer=0
-        for other in threads:
-            score=len(art.reflines.intersection(other.mainlines))
-            if score>max_score:
-                max_score=score
-                max_refer=other
-        art.refer=max_refer
-
-def genRefTreeRoot(level,art,threads,out):
-    print >>out,"""<tr><td>%s</td><td><a href="https://bbs.sjtu.edu.cn/bbsqry?userid=%s">%s</a></td>
-<td>%s<a href=\"%s\" title=\"%s\">%s</a></td></tr>"""%(
-        art.date,art.author,art.author,"｜"*level+"└",art.url,
-        escape_html(re.sub("<.*?>","","\n".join(art.article))),
-        art.title)
-    for child in threads:
-        if child.refer==art:
-            genRefTreeRoot(level+1,child,threads,out)
-    
-def genRefTree(threads,out):
-    for art in threads:
-        if art.refer==0:
-            genRefTreeRoot(0,art,threads,out)
-
-@app.route("/tree/<path:url>")
-@app.route("/tree")
-def treeyssy(url):
-    url=request.url
-    url=url[url.rfind('/')+1:]
-    from StringIO import StringIO
-    from time import clock
-    start=clock()
-    out=StringIO()
-    article=None
-    threads=None
-    if url.startswith(URLTHREADFIND):
-        threads=getThread(URLBASE+url)
-    else:
-        if url.startswith(URLTHREADALL):
-            url=getArticleUrl(URLBASE+url)
-        article=Article(URLBASE+url)
-        threads=article.getThread()
-    calcRef(threads)
-    genRefTree(threads,out)
-    html=out.getvalue()
-    out.close()
-    end=clock()
-    return render_template("treeyssy.html",article=article,threads=html,count=len(threads),time=(end-start))
-
-
-
 def soupdump(var):
     if isinstance(var,tuple):
         return [soupdump(x) for x in var]
@@ -225,6 +118,7 @@ def api(func, *args, **kwargs):
     }
     
     result = soupdump(result)
+    xml_list_names['args'] = u'arg'
     
     if format == u'raw':
         return result
@@ -307,6 +201,8 @@ def url_article(url):
 @api
 def article(url, *args, **kwargs):
     result = {}
+    result[u'url'] = url
+    
     html = fetch(URLBASE + url)
     soup = BS(html)
     
@@ -383,8 +279,11 @@ def article(url, *args, **kwargs):
         
     text_lines = content_lines[4:reply_index]
     
+
+    
     result[u'content'] = {
         u'author': content.a ,
+        u'author_link': content.a[u'href'] ,
         u'board' : content_lines[0][content_lines[0].rfind(' ') + 1:] ,
         u'title' : content_lines[1][6:] ,
         u'datetime_str' : datetime_str ,
@@ -641,7 +540,7 @@ def board(url, *args, **kwargs):
     return (result, xml_map, u'board')
 
 
-@app.route(u'/api/thread/<board>/<file_>', methods=[u'GET', u'POST'])
+@app.route(u'/api/thread/<board>/<reid>', methods=[u'GET', u'POST'])
 def rest_thread(board, reid):
     ext = reid[reid.rindex(u'.')+1:]
     if ext in [u'json', u'xml', u'jsonp']:
@@ -707,8 +606,132 @@ def api_thread():
 @api
 def thread(url, *args, **kwargs):
     result = {}
+    html = fetch(URLBASE + url, mc=False)
+    soup = BS(html)
+    center = soup.center.contents
     
-    return (result,{},u'thread')
+    result[u'page_title'] = center[0]
+    headline = center[1]
+    result[u'board'] = re.findall(u'\[讨论区: (.+?)\]', headline)[0]
+    result[u'topic'] = re.findall(u" \[主题 '(.+?)'\]", headline)[0]
+    
+    trs = soup.table(u'tr')[1:]
+    result['articles'] = []
+    for tr in trs:
+        cont = tr.contents
+        datetime_str = cont[2].string
+        current_year = unicode(datetime.now().year)+datetime_str
+        datetime_ = datetime.strptime(current_year, u'%Y%b %d')
+        link = cont[3].a[u'href']
+        board = re.findall(u'board=(.+?)&', link)[0]
+        file_ = re.findall(u'file=(.+)$', link)[0]
+        art = {
+            u'id': int(cont[0].string),
+            u'user': cont[1].a ,
+            u'user_link': cont[1].a[u'href'], 
+            u'datetime_str': datetime_str,
+            u'datetime_ctime': datetime_.ctime(),
+            u'datetime_tuple': tuple(datetime_.timetuple()[:6]),
+            u'datetime_epoch': repr(time.mktime(datetime_.timetuple())),
+            u'title': cont[3].a,
+            u'link': link,
+            u'board': board,
+            u'file': file_,
+        }
+        result['articles'].append(art)
+    result[u'count'] = int(re.findall(u'共找到 ([0-9]+) 篇',center[6])[0])
+    result[u'board_link'] = center[7][u'href']
+    result[u'bbstcon_link'] = center[9][u'href']
+    
+
+    return (result,{'datetime_tuple':'int','articles':'article'},u'thread')
+def treehtml(art):
+    replies = []
+    art[u'replies'].sort(key = lambda x:float(x[u'content'][u'datetime_epoch']))
+    for reply in art[u'replies']:
+        replies.append(treehtml(reply))
+    return render_template(u'treeart.html',
+        article=art, replies=replies, 
+        content_lines = u'\n'.join(art[u'content_lines']),
+        baseurl = URLBASE)
+
+def calcscore(art, other, maxp):
+    from difflib import get_close_matches
+    score = 0
+    for line in art[u'reply_lines']:
+        for otherline in (other[u'text_lines']):
+            l1 = len(line)
+            l2 = len(otherline)
+            l = l1 if l1 < l2 else l2
+            if len(set(line).intersection(otherline)) > l/2:
+                score += 1
+    return score
+
+@app.route(u"/tree/<path:url>")
+@app.route(u"/tree")
+def tree(url):
+    url=request.url
+    url=url[url.rfind(u'/')+1:]
+    from time import clock
+    start=clock()
+
+    thread_json = thread(url, format=u'raw', callback=u'', pretty=False)
+    threads = []
+    index = 0
+    for art in thread_json[u'articles']:
+        art_json = article(art[u'link'], format=u'raw', callback=u'', pretty=False)
+        art_json['text_lines'] = []
+        for line in art_json['content']['text_lines']:
+            while len(line)>80:
+                art_json['text_lines'].append(line[:80])
+                line = line[80:]
+            if len(line.strip()) > 0:
+                art_json['text_lines'].append(line)
+                
+        art_json['reply_lines'] = []
+        for line in art_json['content']['reply_lines']:
+            while len(line)>80:
+                art_json['reply_lines'].append(line[:80])
+                line = line[80:]
+            art_json['reply_lines'].append(line)
+        
+        art_json[u'replies'] = []
+        art_json[u'index'] = index
+        index += 1
+        threads.append(art_json)
+        
+    maxp = len(threads)
+    
+    for art in threads:
+        max_score = 0
+        max_refer = None
+        for other in threads:
+            if other['index'] == art['index']:
+                continue
+            score = calcscore(art, other, maxp)
+            if score > max_score:
+                max_score = score
+                max_refer = other
+        art[u'refer'] = max_refer
+        art[u'score'] = max_score
+        if max_refer != None:
+            max_refer[u'replies'].append(art)
+    
+    for art in threads[1:]:
+        if art[u'refer'] == None:
+            art[u'refer'] = threads[0]
+            threads[0][u'replies'].append(art)
+    
+    end=clock()
+    
+    #ans = []
+    #for art in threads[1:]:
+    #    ans.append('%s -> %s'%(art[u'index'],art[u'refer'][u'index']))
+    #return '<br/>'.join(ans)
+    return render_template('treeyssy.html',treehtml = treehtml(threads[0]),thread = thread_json, time = end - start)
+
+
+
 if __name__ == '__main__':
     app.run()
 #########################################################################
