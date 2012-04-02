@@ -15,6 +15,7 @@ try:
     PYSSY_SAE = True
 except:
     PYSSY_SAE = False
+    from redis import StrictRedis
 
 
 import json, re
@@ -29,19 +30,23 @@ from flask import (Flask, g, request, abort, redirect,
 
 from dict2xml import dict2xml
 
-from decorator import decorator
+
+from iso8601 import parse_date
 
 app = Flask(__name__)
 app.debug = True
 
-VERSION = 5
+VERSION = 6
 
 app.config[u'VERSION'] = VERSION
+
 @app.before_request
 def before_request():
     if PYSSY_SAE:
         appinfo = sae.core.Application()
         g.mc = pylibmc.Client()
+    else:
+        g.mc = StrictRedis()
     
 
 @app.teardown_request
@@ -67,20 +72,34 @@ URLARTICLE=URLBASE+"bbscon?"
 URLTHREADALL="bbstcon"
 URLTHREADFIND="bbstfind"
 
+def str2datetime(st):
+    return parse_date(st)
 
-# default timeout is 10 seconds
-def fetch(url, timeout = 10):
+def datetime2str(dt):
+    return dt.isoformat()
+
+
+# Use Memcached in SAE or Redis locally
+# Redis only support String, so convert before/after store
+def fetch(url, timeout):
+    now = datetime2str(str2datetime(datetime2str(datetime.now())))
     if timeout > 0 and hasattr(g,'mc'):
         result = g.mc.get(url.encode('ascii'))
-        if result and result is dict:
-            expired = (datetime.now() - result['time']).total_seconds() > timeout
-            if not expired:
-                return result['html']
-        html = urlopen(url).read().decode("gbk","ignore")
-        g.mc.set(url.encode('ascii'), {'html':html,'time':datetime.now()})
-        return html
+        if result:
+            result = result.decode("gbk","ignore")
+            result_time = str2datetime(g.mc.get('time:'+url.encode('ascii')))
+            if result_time:
+                expired = (str2datetime(now) - result_time).total_seconds() > timeout
+                if not expired:
+                    return (result, datetime2str(result_time))
+        html = urlopen(URLBASE + url).read().decode("gbk","ignore")
+        if result == html:
+            return (result, datetime2str(result_time))
+        g.mc.set(url.encode('ascii'), html.encode("gbk","ignore"))
+        g.mc.set('time:'+url.encode('ascii'), now)
+        return (html, now)
     else:
-        return urlopen(url).read().decode("gbk","ignore")
+        return (urlopen(URLBASE + url).read().decode("gbk","ignore"), datetime2str(datetime.now()))
 
 def soupdump(var):
     if isinstance(var,tuple):
@@ -98,47 +117,75 @@ def soupdump(var):
     else:
         return unicode(var)
 
-@decorator
-def api(func, *args, **kwargs):
-    format, pretty, callback = kwargs['format'], kwargs['pretty'], kwargs['callback']
-    del kwargs['format'], kwargs['pretty'], kwargs['callback']
-    if not format in [u'json', u'xml', u'jsonp', u'raw']:
-        return u'Format "%s" not supported! Use "json" or "xml".'%format
-    if format == u'json' and callback != u'':
-        format = u'jsonp'
-    
-    result, xml_list_names, roottag = func(*args, **kwargs)
-    
-    result[u'api'] = {
-        u'args'         : args,
-        u'kargs'        : kwargs, 
-        u'request_url'  : request.url,
-        u'format'       : format,
-        u'pretty'       : pretty,
-        u'callback'     : callback,
-        u'version'      : app.config[u'VERSION'],
-        u'values'       : request.values,
-        u'name'         : roottag,
-    }
-    
-    result = soupdump(result)
-    xml_list_names['args'] = u'arg'
-    
-    if format == u'raw':
-        return result
-    elif format == u'xml':
-        return Response(dict2xml(result, roottag=roottag,
-            listnames=xml_list_names, pretty=pretty), content_type=u'text/xml')
-    else:
-        if pretty:
-            json_result = json.dumps(result,
-                ensure_ascii = False, sort_keys=True, indent=4)
-        else:
-            json_result = json.dumps(result, ensure_ascii = False)
-        if callback != '':
-            return Response('%s(%s);'%(callback, json_result), content_type=u'application/javascript')
-        else:
-            return Response(json_result, content_type=u'application/json')
+class api(object):
+    def __init__(self, timeout):
+        self.timeout = timeout
+        
+    def __call__(self, func):
+        def wrap(*args, **kwargs):
+            url, format, pretty, callback = (kwargs['url'], 
+                kwargs['format'], kwargs['pretty'], kwargs['callback'])
+            del kwargs['url'], kwargs['format'], kwargs['pretty'], kwargs['callback']
+            
+            if not format in [u'json', u'xml', u'jsonp', u'raw']:
+                return u'Format "%s" not supported! Use "json" or "xml".'%format
+            if format == u'json' and callback != u'':
+                format = u'jsonp'
+            
+            if u'If-Modified-Since' in request.headers:
+                modified_since = request.headers[u'If-Modified-Since']
+            else:
+                modified_since = u''
+            
+            html,fetch_time = fetch(url, self.timeout)
+            
+            if modified_since == fetch_time:
+                return Response(status=304)
+            
+            result, xml_list_names, roottag = func(html)
+            
+            result[u'api'] = {
+                u'args'             : args,
+                u'kargs'            : kwargs, 
+                u'request_url'      : request.url,
+                u'format'           : format,
+                u'pretty'           : pretty,
+                u'callback'         : callback,
+                u'version'          : app.config[u'VERSION'],
+                u'values'           : request.values,
+                u'name'             : roottag,
+                u'fetch_time'       : fetch_time,
+                u'fetch_hash'       : hash(html),
+                #u'modified_since'   : modified_since,
+            }
+            
+            headers = {u'Last-Modified': fetch_time}
+            
+            result = soupdump(result)
+            xml_list_names['args'] = u'arg'
+            
+            if format == u'raw':
+                return result
+            elif format == u'xml':
+                return Response(dict2xml(result, roottag=roottag,
+                    listnames=xml_list_names, pretty=pretty),
+                    headers=headers,
+                    content_type=u'text/xml; charset=utf-8')
+            else:
+                if pretty:
+                    json_result = json.dumps(result,
+                        ensure_ascii = False, sort_keys=True, indent=4)
+                else:
+                    json_result = json.dumps(result, ensure_ascii = False)
+                if callback != '':
+                    return Response('%s(%s);'%(callback, json_result), 
+                        headers=headers,
+                        content_type=u'text/javascript; charset=utf-8')
+                else:
+                    return Response(json_result, 
+                        headers=headers,
+                        content_type=u'application/json; charset=utf-8')
+        return wrap
 @app.route(u'/api/article/<board>/<file_>', methods=[u'GET', u'POST'])
 def rest_article(board, file_):
     ext = file_[file_.rindex(u'.')+1:]
@@ -158,7 +205,7 @@ def rest_article(board, file_):
     else:
         callback = '' 
     url = u'bbscon?board=%s&file=%s'%(board, file_)
-    return article(url, format=format, pretty=pretty, callback=callback)
+    return article(url=url, format=format, pretty=pretty, callback=callback)
     
 @app.route(u'/api/article', methods=[u'GET', u'POST'])
 def api_article():
@@ -181,7 +228,7 @@ def api_article():
     else:
         callback = '' 
     url = url[url.rfind(u'/') + 1:]
-    return article(url, format=format, pretty=pretty, callback=callback)
+    return article(url=url, format=format, pretty=pretty, callback=callback)
 
 @app.route('/article/<path:url>', methods=['GET', 'POST'])
 @app.route('/article', methods=['GET', 'POST'])
@@ -200,14 +247,11 @@ def url_article(url):
     else:
         pretty = False
     url = url[url.rfind(u'/') + 1:]
-    return article(url, format=format, pretty=pretty, callback=callback)
+    return article(url=url, format=format, pretty=pretty, callback=callback)
 
-@api
-def article(url, *args, **kwargs):
+@api(10)
+def article(html):
     result = {}
-    result[u'url'] = url
-    
-    html = fetch(URLBASE + url)
     soup = BS(html)
     
     result[u'page_title'] = soup.title
@@ -344,7 +388,7 @@ def api_board():
         callback = request.values['callback']
     else:
         callback = '' 
-    return board(url, format=format, pretty=pretty, callback=callback)
+    return board(url=url, format=format, pretty=pretty, callback=callback)
 
 @app.route(u'/board/<path:url>', methods=[u'GET', u'POST'])
 @app.route(u'/board', methods=[u'GET', u'POST'])
@@ -363,7 +407,7 @@ def url_board(url):
     else:
         callback = '' 
     url = url[url.rfind(u'/') + 1:]
-    return board(url, format=format, pretty=pretty, callback=callback)
+    return board(url=url, format=format, pretty=pretty, callback=callback)
 
 @app.route('/api/board/<b>', methods=['GET', 'POST'])
 def rest_board(b):
@@ -399,12 +443,11 @@ def rest_board(b):
         callback = request.values['callback']
     else:
         callback = '' 
-    return board(url, format=format, pretty=pretty, callback=callback)
-@api
-def board(url, *args, **kwargs):
+    return board(url=url, format=format, pretty=pretty, callback=callback)
+@api(2)
+def board(html):
     result = {}
     
-    html = fetch(URLBASE + url, timeout = 1)
     soup = BS(html)
     result[u'board'] = soup.body(u'input', type=u'hidden')[0][u'value']
     title = soup.body.table.tr.font.b.string
@@ -563,7 +606,7 @@ def rest_thread(board, reid):
     else:
         callback = '' 
     url = u'bbstfind0?board=%s&reid=%s'%(board, reid)
-    return thread(url, format=format, pretty=pretty, callback=callback)
+    return thread(url=url, format=format, pretty=pretty, callback=callback)
     
 @app.route('/thread/<path:url>', methods=['GET', 'POST'])
 @app.route('/thread', methods=['GET', 'POST'])
@@ -582,7 +625,7 @@ def url_thread(url):
     else:
         pretty = False
     url = url[url.rfind(u'/') + 1:]
-    return thread(url, format=format, pretty=pretty, callback=callback)
+    return thread(url=url, format=format, pretty=pretty, callback=callback)
 
 @app.route(u'/api/thread', methods=[u'GET', u'POST'])
 def api_thread():
@@ -605,12 +648,11 @@ def api_thread():
     else:
         callback = '' 
     url = url[url.rfind(u'/') + 1:]
-    return thread(url, format=format, pretty=pretty, callback=callback)
+    return thread(url=url, format=format, pretty=pretty, callback=callback)
 
-@api
-def thread(url, *args, **kwargs):
+@api(2)
+def thread(html):
     result = {}
-    html = fetch(URLBASE + url, timeout = 1)
     soup = BS(html)
     center = soup.center.contents
     
@@ -683,7 +725,7 @@ def tree(url):
     threads = []
     index = 0
     for art in thread_json[u'articles']:
-        art_json = article(art[u'link'], format=u'raw', callback=u'', pretty=False)
+        art_json = article(url=art[u'link'], format=u'raw', callback=u'', pretty=False)
         art_json['text_lines'] = []
         for line in art_json['content']['text_lines']:
             while len(line)>80:
