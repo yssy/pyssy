@@ -1,4 +1,25 @@
 # -*- coding: utf-8 -*-
+
+'''
+-----
+簡介
+-----
+
+Pyssy 是一系列用於 `上海交通大學 飲水思源站 <http://bbs.sjtu.edu.cn>`_ 的Python腳本。
+
+Pyssy 既可以寄宿在Sina App Engine上，也可以單獨使用。
+
+----------
+依賴項
+----------
+
+==========  ======================================================
+Flask        Pyssy使用Flask作爲網頁服務框架。
+pylibmc      託管在SAE上的Pyssy使用pylibmc訪問SAE的memcached服務。
+Redis-py     獨立運行的Pyssy使用Redis作爲memcached服務的替代。
+==========  ======================================================
+'''
+
 try:
     # try to load sae to test are we on sina app engine
     import sae
@@ -12,10 +33,14 @@ try:
     import sae
     import sae.core
     
-    PYSSY_SAE = True
+    SAE_MC = True
 except:
-    PYSSY_SAE = False
-    from redis import StrictRedis
+    SAE_MC = False
+    try:
+        from redis import StrictRedis
+        REDIS_MC = True
+    except:
+        REDIS_MC = False
 
 
 import json, re
@@ -29,8 +54,6 @@ from flask import (Flask, g, request, abort, redirect,
                    url_for, render_template, Markup, flash, Response)
 
 from dict2xml import dict2xml
-
-
 from iso8601 import parse_date
 
 app = Flask(__name__)
@@ -40,32 +63,7 @@ VERSION = 6
 
 app.config[u'VERSION'] = VERSION
 
-@app.before_request
-def before_request():
-    if PYSSY_SAE:
-        appinfo = sae.core.Application()
-        g.mc = pylibmc.Client()
-    else:
-        g.mc = StrictRedis()
-    
 
-@app.teardown_request
-def teardown_request(exception):
-    if hasattr(g, 'db'): g.db.close()
-
-
-
-@app.route('/')
-def hello():
-    html= u"""
-        <p>欢迎使用pyssy工具。</p>
-        <p>请将水源的网址中http://bbs.sjtu.edu.cn/ 替换为 http://pyssy.sinasae.com/&lt;service&gt;/ </p>
-        <p>目前支持的service有： tree —— 树状主题列表</p>
-        """ 
-    return render_template('template.html',body=html)
-
-
-##########################################################################
 URLBASE="http://bbs.sjtu.edu.cn/"
 URLTHREAD=URLBASE+"bbstfind0?"
 URLARTICLE=URLBASE+"bbscon?"
@@ -79,9 +77,12 @@ def datetime2str(dt):
     return dt.isoformat()
 
 
-# Use Memcached in SAE or Redis locally
-# Redis only support String, so convert before/after store
+
 def fetch(url, timeout):
+    '''
+    Use Memcached in SAE or Redis locally
+    Redis only support String, so convert before/after store
+    '''
     now = datetime2str(str2datetime(datetime2str(datetime.now())))
     if timeout > 0 and hasattr(g,'mc'):
         result = g.mc.get(url.encode('ascii'))
@@ -100,6 +101,32 @@ def fetch(url, timeout):
         return (html, now)
     else:
         return (urlopen(URLBASE + url).read().decode("gbk","ignore"), datetime2str(datetime.now()))
+
+@app.before_request
+def before_request():
+    if SAE_MC:
+        appinfo = sae.core.Application()
+        g.mc = pylibmc.Client()
+    elif REDIS_MC:
+        g.mc = StrictRedis()
+    
+    
+
+@app.teardown_request
+def teardown_request(exception):
+    if hasattr(g, 'db'): g.db.close()
+
+
+
+@app.route('/')
+def hello():
+    html= u"""
+        <p>欢迎使用pyssy工具。</p>
+        <p>请将水源的网址中http://bbs.sjtu.edu.cn/ 替换为 http://pyssy.sinasae.com/&lt;service&gt;/ </p>
+        <p>目前支持的service有： tree —— 树状主题列表</p>
+        """ 
+    return render_template('template.html',body=html)
+
 
 def soupdump(var):
     if isinstance(var,tuple):
@@ -123,9 +150,28 @@ class api(object):
         
     def __call__(self, func):
         def wrap(*args, **kwargs):
-            url, format, pretty, callback = (kwargs['url'], 
-                kwargs['format'], kwargs['pretty'], kwargs['callback'])
-            del kwargs['url'], kwargs['format'], kwargs['pretty'], kwargs['callback']
+            if 'format' in request.values:
+                format = request.values['format']
+            else:
+                format = 'json'
+            if 'pretty' in request.values:
+                pretty = int(request.values['pretty']) == 1
+            else:
+                pretty = False
+            if 'callback' in request.values:
+                callback = request.values['callback']
+            else:
+                callback = '' 
+            if 'include' in request.values:
+                include = int(request.values['include']) == 1
+            else:
+                include = False
+            
+            if 'url'      in kwargs: url         = kwargs['url']
+            if 'format'   in kwargs: format      = kwargs['format']
+            if 'pretty'   in kwargs: pretty      = kwargs['pretty']
+            if 'callback' in kwargs: callback    = kwargs['callback']
+            if 'include'  in kwargs: include     = kwargs['include']
             
             if not format in [u'json', u'xml', u'jsonp', u'raw']:
                 return u'Format "%s" not supported! Use "json" or "xml".'%format
@@ -137,27 +183,41 @@ class api(object):
             else:
                 modified_since = u''
             
+            start = time.clock()
             html,fetch_time = fetch(url, self.timeout)
+            end_fetch = time.clock()
             
             if modified_since == fetch_time:
                 return Response(status=304)
             
-            result, xml_list_names, roottag = func(html)
+            result, xml_list_names = func(html)
             
-            result[u'api'] = {
-                u'args'             : args,
-                u'kargs'            : kwargs, 
-                u'request_url'      : request.url,
-                u'format'           : format,
-                u'pretty'           : pretty,
-                u'callback'         : callback,
-                u'version'          : app.config[u'VERSION'],
-                u'values'           : request.values,
-                u'name'             : roottag,
-                u'fetch_time'       : fetch_time,
-                u'fetch_hash'       : hash(html),
-                #u'modified_since'   : modified_since,
-            }
+            roottag = func.__name__
+            
+            if include and u'articles' in result:
+                for artlink in result[u'articles']:
+                    art,xl = article(url=artlink[u'link'], format=u'raw')
+                    artlink[u'include'] = art
+                    xml_list_names.update(xl)
+            
+            end_parse = time.clock()
+            
+            if format != u'raw':
+                result[u'api'] = {
+                    u'args'             : args,
+                    u'kargs'            : kwargs, 
+                    u'request_url'      : request.url,
+                    u'format'           : format,
+                    u'pretty'           : pretty,
+                    u'callback'         : callback,
+                    u'version'          : app.config[u'VERSION'],
+                    u'values'           : request.values,
+                    u'name'             : roottag,
+                    u'fetch_time'       : fetch_time,
+                    u'fetch_hash'       : hash(html),
+                    u'fetch_elapse'     : end_fetch - start,
+                    u'elapse'           : end_parse - start,
+                }
             
             headers = {u'Last-Modified': fetch_time}
             
@@ -165,7 +225,7 @@ class api(object):
             xml_list_names['args'] = u'arg'
             
             if format == u'raw':
-                return result
+                return result, xml_list_names
             elif format == u'xml':
                 return Response(dict2xml(result, roottag=roottag,
                     listnames=xml_list_names, pretty=pretty),
@@ -178,7 +238,7 @@ class api(object):
                 else:
                     json_result = json.dumps(result, ensure_ascii = False)
                 if callback != '':
-                    return Response('%s(%s);'%(callback, json_result), 
+                    return Response('%s([%s]);'%(callback, json_result), 
                         headers=headers,
                         content_type=u'text/javascript; charset=utf-8')
                 else:
@@ -194,18 +254,9 @@ def rest_article(board, file_):
         file_ = file_[:file_.rindex(u'.')]
     else:
         format = 'json'
-    if 'pretty' in request.values:
-        pretty = int(request.values['pretty']) == 1
-    else:
-        pretty = False
-    if 'callback' in request.values:
-        callback = request.values['callback']
-        if format == 'json':
-            format = 'jsonp'
-    else:
-        callback = '' 
+    
     url = u'bbscon?board=%s&file=%s'%(board, file_)
-    return article(url=url, format=format, pretty=pretty, callback=callback)
+    return article(url=url, format=format)
     
 @app.route(u'/api/article', methods=[u'GET', u'POST'])
 def api_article():
@@ -215,41 +266,19 @@ def api_article():
         file_ = request.values[u'file']
         board = request.values[u'board']
         url = u'bbscon?board=%s&file=%s'%(board, file_)
-    if 'format' in request.values:
-        format = request.values['format']
-    else:
-        format = 'json'
-    if 'pretty' in request.values:
-        pretty = int(request.values['pretty']) == 1
-    else:
-        pretty = False
-    if 'callback' in request.values:
-        callback = request.values['callback']
-    else:
-        callback = '' 
+
     url = url[url.rfind(u'/') + 1:]
-    return article(url=url, format=format, pretty=pretty, callback=callback)
+    return article(url=url)
 
 @app.route('/article/<path:url>', methods=['GET', 'POST'])
 @app.route('/article', methods=['GET', 'POST'])
 def url_article(url):
     url = request.url
-    if 'format' in request.values:
-        format = request.values['format']
-    else:
-        format = 'json'
-    if 'callback' in request.values:
-        callback = request.values['callback']
-    else:
-        callback = '' 
-    if 'pretty' in request.values:
-        pretty = int(request.values['pretty']) == 1
-    else:
-        pretty = False
+    
     url = url[url.rfind(u'/') + 1:]
-    return article(url=url, format=format, pretty=pretty, callback=callback)
+    return article(url=url)
 
-@api(10)
+@api(16)
 def article(html):
     result = {}
     soup = BS(html)
@@ -271,7 +300,10 @@ def article(html):
             })
             
     re_link = unicode(filter(lambda x: x[u'action']==u'bbspst', result[u'links'])[0]['url'])
-    result['reid'] = int(re.findall(u'(\w*)$',re_link)[0])
+    result[u'reid'] = int(re.findall(u'(\w*)$',re_link)[0])
+    result[u'file_id'] = int(re.findall(u'M\\.(\w*)\\.A',re_link)[0])
+    result[u'file'] = 'M.%d.A'%result[u'file_id']
+    result[u'url'] = u'bbscon?board=%s&file=%s'%(result[u'board'], result[u'file'])
     
     content = body.table.tr.pre #<pre>content</pre>
     content_raw = unicode(content)[5:-6]
@@ -327,8 +359,6 @@ def article(html):
         
     text_lines = content_lines[4:reply_index]
     
-
-    
     result[u'content'] = {
         u'author': content.a ,
         u'author_link': content.a[u'href'] ,
@@ -357,7 +387,7 @@ def article(html):
         u'args':            u'arg',
     }
 
-    return (result, xml_list_names, 'article')
+    return (result, xml_list_names)
 @app.route(u'/api/board', methods=[u'GET', u'POST'])
 def api_board():
     if 'url' in request.values:
@@ -376,38 +406,15 @@ def api_board():
         else:
             page = 'latest'
             url = u'bbsdoc?board=%s'%(board_)
-    if 'format' in request.values:
-        format = request.values['format']
-    else:
-        format = 'json'
-    if 'pretty' in request.values:
-        pretty = int(request.values['pretty']) == 1
-    else:
-        pretty = False
-    if 'callback' in request.values:
-        callback = request.values['callback']
-    else:
-        callback = '' 
-    return board(url=url, format=format, pretty=pretty, callback=callback)
+    
+    return board(url=url)
 
 @app.route(u'/board/<path:url>', methods=[u'GET', u'POST'])
 @app.route(u'/board', methods=[u'GET', u'POST'])
 def url_board(url):
     url = request.url
-    if 'format' in request.values:
-        format = request.values['format']
-    else:
-        format = 'json'
-    if 'pretty' in request.values:
-        pretty = int(request.values['pretty']) == 1
-    else:
-        pretty = False
-    if 'callback' in request.values:
-        callback = request.values['callback']
-    else:
-        callback = '' 
     url = url[url.rfind(u'/') + 1:]
-    return board(url=url, format=format, pretty=pretty, callback=callback)
+    return board(url=url)
 
 @app.route('/api/board/<b>', methods=['GET', 'POST'])
 def rest_board(b):
@@ -433,17 +440,7 @@ def rest_board(b):
     else:
         page = 'latest'
         url = u'bbsdoc?board=%s'%(board_)
-    if 'format' in request.values:
-        format = request.values['format']
-    if 'pretty' in request.values:
-        pretty = int(request.values['pretty']) == 1
-    else:
-        pretty = False
-    if 'callback' in request.values:
-        callback = request.values['callback']
-    else:
-        callback = '' 
-    return board(url=url, format=format, pretty=pretty, callback=callback)
+    return board(url=url)
 @api(2)
 def board(html):
     result = {}
@@ -516,6 +513,7 @@ def board(html):
         mark = mark if mark != None else u''
         link = unicode(art_list[4].a[u'href'])
         file_ = re.findall(u'file.(.+?)(\.html){0,1}$', link)[0][0]
+        file_id = int(file_[2:-2])
         datetime_str = art_list[3].string
         current_year = str(datetime.now().year)+datetime_str
         datetime_ = datetime.strptime(current_year,'%Y%b %d %H:%M')
@@ -530,6 +528,7 @@ def board(html):
             u'title': art_list[4].a,
             u'link': link,
             u'file': file_,
+            u'file_id': file_id,
             u'words_str': words_str,
             u'words' : words
         }
@@ -584,7 +583,7 @@ def board(html):
                 u'friend_links':    u'link',
                 u'datetime_tuple':  u'int',
               }
-    return (result, xml_map, u'board')
+    return (result, xml_map)
 
 
 @app.route(u'/api/thread/<board>/<reid>', methods=[u'GET', u'POST'])
@@ -595,37 +594,17 @@ def rest_thread(board, reid):
         reid = reid[:reid.rindex(u'.')]
     else:
         format = 'json'
-    if 'pretty' in request.values:
-        pretty = int(request.values['pretty']) == 1
-    else:
-        pretty = False
-    if 'callback' in request.values:
-        callback = request.values['callback']
-        if format == 'json':
-            format = 'jsonp'
-    else:
-        callback = '' 
+
     url = u'bbstfind0?board=%s&reid=%s'%(board, reid)
-    return thread(url=url, format=format, pretty=pretty, callback=callback)
+    return thread(url=url)
     
 @app.route('/thread/<path:url>', methods=['GET', 'POST'])
 @app.route('/thread', methods=['GET', 'POST'])
 def url_thread(url):
     url = request.url
-    if 'format' in request.values:
-        format = request.values['format']
-    else:
-        format = 'json'
-    if 'callback' in request.values:
-        callback = request.values['callback']
-    else:
-        callback = '' 
-    if 'pretty' in request.values:
-        pretty = int(request.values['pretty']) == 1
-    else:
-        pretty = False
+
     url = url[url.rfind(u'/') + 1:]
-    return thread(url=url, format=format, pretty=pretty, callback=callback)
+    return thread(url=url)
 
 @app.route(u'/api/thread', methods=[u'GET', u'POST'])
 def api_thread():
@@ -635,20 +614,8 @@ def api_thread():
         reid = request.values[u'reid']
         board = request.values[u'board']
         url = u'bbstfind0?board=%s&reid=%s'%(board, reid)
-    if 'format' in request.values:
-        format = request.values['format']
-    else:
-        format = 'json'
-    if 'pretty' in request.values:
-        pretty = int(request.values['pretty']) == 1
-    else:
-        pretty = False
-    if 'callback' in request.values:
-        callback = request.values['callback']
-    else:
-        callback = '' 
     url = url[url.rfind(u'/') + 1:]
-    return thread(url=url, format=format, pretty=pretty, callback=callback)
+    return thread(url=url)
 
 @api(2)
 def thread(html):
@@ -690,7 +657,51 @@ def thread(html):
     result[u'bbstcon_link'] = center[9][u'href']
     
 
-    return (result,{'datetime_tuple':'int','articles':'article'},u'thread')
+    return (result,{'datetime_tuple':'int','articles':'article'})
+@app.route(u'/api/bbsall.jsonp', methods=[u'GET', u'POST'])
+@app.route(u'/api/bbsall.json', methods=[u'GET', u'POST'])
+@app.route(u'/api/bbsall.xml', methods=[u'GET', u'POST'])
+@app.route(u'/api/bbsall', methods=[u'GET', u'POST'])
+def api_bbsall():
+    if 'url' in request.values:
+        url = request.values[u'url']
+    else:
+        url = u'bbsall'
+    if '.' in request.url:
+        if '?' in request.url:
+            last = request.url.rindex('?')
+        else:
+            last = len(request.url)
+        format = request.url[request.url.rindex('.')+1: last]
+    else:
+        format = 'json'
+    return bbsall(url=url,format=format)
+
+@api(3600)
+def bbsall(html):
+    result = {}
+    soup = BS(html)
+    center = soup.center
+    
+    result['count'] = int(re.findall(u'\[讨论区数: (\\d+)\]',center.contents[2])[0])
+    result['boards'] = []
+    
+    for tr in center(u'tr')[1:]:
+        board = {}
+        tds = tr(u'td')
+        board[u'id'] = int(tds[0].string)
+        board[u'board'] = tds[1].a
+        board[u'link'] = tds[1].a[u'href']
+        board[u'category'] = tds[2].string[1:-1]
+        chinese = tds[3].a.string
+        board[u'chinese'] = chinese[3:]
+        board[u'trans'] = chinese[1]
+        board[u'bm'] = u'' if tds[4].a == None else tds[4].a
+        
+        result[u'boards'] .append(board)
+    
+
+    return (result,{u'boards':u'board'})
 def treehtml(art):
     replies = []
     art[u'replies'].sort(key = lambda x:float(x[u'content'][u'datetime_epoch']))
@@ -721,11 +732,11 @@ def tree(url):
     from time import clock
     start=clock()
 
-    thread_json = thread(url, format=u'raw', callback=u'', pretty=False)
+    thread_json,xl = thread(url=url, format=u'raw', callback=u'', pretty=False)
     threads = []
     index = 0
     for art in thread_json[u'articles']:
-        art_json = article(url=art[u'link'], format=u'raw', callback=u'', pretty=False)
+        art_json,xl = article(url=art[u'link'], format=u'raw', callback=u'', pretty=False)
         art_json['text_lines'] = []
         for line in art_json['content']['text_lines']:
             while len(line)>80:
