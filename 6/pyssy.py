@@ -44,7 +44,7 @@ except:
 
 
 import json, re
-from datetime import datetime
+import datetime
 import time
 from urllib2 import urlopen
 
@@ -71,9 +71,13 @@ URLTHREADALL="bbstcon"
 URLTHREADFIND="bbstfind"
 
 def str2datetime(st):
+    if st == None:
+        return None
     return parse_date(st)
 
 def datetime2str(dt):
+    if dt==None:
+        return None
     return dt.isoformat()
 
 
@@ -83,21 +87,21 @@ def fetch(url, timeout):
     Use Memcached in SAE or Redis locally
     Redis only support String, so convert before/after store
     '''
-    now = datetime2str(str2datetime(datetime2str(datetime.now())))
+    now = datetime2str(str2datetime(datetime2str(datetime.datetime.now())))
     if timeout > 0 and hasattr(g,'mc'):
         result = g.mc.get(url.encode('ascii'))
         if result:
             result = result.decode("gbk","ignore")
-            result_time = str2datetime(g.mc.get('time:'+url.encode('ascii')))
+            result_time = str2datetime(g.mc.get('time'+url.encode('ascii')))
             if result_time:
-                expired = (str2datetime(now) - result_time).total_seconds() > timeout
+                expired = (str2datetime(now) - result_time) > datetime.timedelta(seconds=timeout)
                 if not expired:
                     return (result, datetime2str(result_time))
         html = urlopen(URLBASE + url).read().decode("gbk","ignore")
-        if result == html:
+        if result == html and result_time != None:
             return (result, datetime2str(result_time))
         g.mc.set(url.encode('ascii'), html.encode("gbk","ignore"))
-        g.mc.set('time:'+url.encode('ascii'), now)
+        g.mc.set('time'+url.encode('ascii'), now)
         return (html, now)
     else:
         return (urlopen(URLBASE + url).read().decode("gbk","ignore"), datetime2str(datetime.now()))
@@ -219,7 +223,7 @@ class api(object):
                     u'elapse'           : end_parse - start,
                 }
             
-            headers = {u'Last-Modified': fetch_time}
+            headers = {'Last-Modified': fetch_time}
             
             result = soupdump(result)
             xml_list_names['args'] = u'arg'
@@ -230,7 +234,7 @@ class api(object):
                 return Response(dict2xml(result, roottag=roottag,
                     listnames=xml_list_names, pretty=pretty),
                     headers=headers,
-                    content_type=u'text/xml; charset=utf-8')
+                    content_type='text/xml; charset=utf-8')
             else:
                 if pretty:
                     json_result = json.dumps(result,
@@ -240,11 +244,11 @@ class api(object):
                 if callback != '':
                     return Response('%s([%s]);'%(callback, json_result), 
                         headers=headers,
-                        content_type=u'text/javascript; charset=utf-8')
+                        content_type='text/javascript; charset=utf-8')
                 else:
                     return Response(json_result, 
                         headers=headers,
-                        content_type=u'application/json; charset=utf-8')
+                        content_type='application/json; charset=utf-8')
         return wrap
 @app.route(u'/api/article/<board>/<file_>', methods=[u'GET', u'POST'])
 def rest_article(board, file_):
@@ -317,7 +321,7 @@ def article(html):
                         int(datetime_str[11:13]),
                         int(datetime_str[14:16]),
                         int(datetime_str[17:19]),]
-    datetime_ = datetime(*datetime_tuple)
+    datetime_ = datetime.datetime(*datetime_tuple)
     
     from_index = -1
     for i in range(len(content_lines)-1, -1, -1):
@@ -515,8 +519,8 @@ def board(html):
         file_ = re.findall(u'file.(.+?)(\.html){0,1}$', link)[0][0]
         file_id = int(file_[2:-2])
         datetime_str = art_list[3].string
-        current_year = str(datetime.now().year)+datetime_str
-        datetime_ = datetime.strptime(current_year,'%Y%b %d %H:%M')
+        current_year = str(datetime.datetime.now().year)+datetime_str
+        datetime_ = datetime.datetime.strptime(current_year,'%Y%b %d %H:%M')
         article = {
             u'id': art_list[0],
             u'mark': mark,
@@ -633,8 +637,8 @@ def thread(html):
     for tr in trs:
         cont = tr.contents
         datetime_str = cont[2].string
-        current_year = unicode(datetime.now().year)+datetime_str
-        datetime_ = datetime.strptime(current_year, u'%Y%b %d')
+        current_year = unicode(datetime.datetime.now().year)+datetime_str
+        datetime_ = datetime.datetime.strptime(current_year, u'%Y%b %d')
         link = cont[3].a[u'href']
         board = re.findall(u'board=(.+?)&', link)[0]
         file_ = re.findall(u'file=(.+)$', link)[0]
@@ -667,12 +671,13 @@ def api_bbsall():
         url = request.values[u'url']
     else:
         url = u'bbsall'
-    if '.' in request.url:
-        if '?' in request.url:
-            last = request.url.rindex('?')
+    rurl = request.url[request.url.rindex('/'):]
+    if '.' in rurl:
+        if '?' in rurl:
+            last = rurl.rindex('?')
         else:
-            last = len(request.url)
-        format = request.url[request.url.rindex('.')+1: last]
+            last = len(rurl)
+        format = rurl[rurl.rindex('.')+1: last]
     else:
         format = 'json'
     return bbsall(url=url,format=format)
