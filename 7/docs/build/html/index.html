@@ -1,0 +1,262 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Pyssy &mdash; Pyssy 6 documentation</title>
+    
+    <link rel="stylesheet" href="_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '6',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="Pyssy 6 documentation" href="#" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="#">Pyssy 6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="module-pyssy">
+<span id="pyssy"></span><h1>Pyssy<a class="headerlink" href="#module-pyssy" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="id1">
+<h2>簡介<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h2>
+<p>Pyssy 是一系列用於 <a class="reference external" href="http://bbs.sjtu.edu.cn">上海交通大學 飲水思源站</a> 的Python腳本。</p>
+<p>Pyssy 既可以寄宿在Sina App Engine上，也可以單獨使用。</p>
+</div>
+<div class="section" id="id3">
+<h2>依賴項<a class="headerlink" href="#id3" title="Permalink to this headline">¶</a></h2>
+<table border="1" class="docutils">
+<colgroup>
+<col width="16%" />
+<col width="84%" />
+</colgroup>
+<tbody valign="top">
+<tr class="row-odd"><td>Flask</td>
+<td>Pyssy使用Flask作爲網頁服務框架。</td>
+</tr>
+<tr class="row-even"><td>pylibmc</td>
+<td>託管在SAE上的Pyssy使用pylibmc訪問SAE的memcached服務。</td>
+</tr>
+<tr class="row-odd"><td>Redis-py</td>
+<td>獨立運行的Pyssy使用Redis作爲memcached服務的替代。</td>
+</tr>
+</tbody>
+</table>
+<dl class="class">
+<dt id="pyssy.api">
+<em class="property">class </em><tt class="descclassname">pyssy.</tt><tt class="descname">api</tt><big>(</big><em>timeout</em><big>)</big><a class="reference internal" href="_modules/pyssy.html#api"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pyssy.api" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="pyssy.api_article">
+<tt class="descclassname">pyssy.</tt><tt class="descname">api_article</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/pyssy.html#api_article"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pyssy.api_article" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="pyssy.api_board">
+<tt class="descclassname">pyssy.</tt><tt class="descname">api_board</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/pyssy.html#api_board"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pyssy.api_board" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="pyssy.api_thread">
+<tt class="descclassname">pyssy.</tt><tt class="descname">api_thread</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/pyssy.html#api_thread"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pyssy.api_thread" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="pyssy.article">
+<tt class="descclassname">pyssy.</tt><tt class="descname">article</tt><big>(</big><em>*args</em>, <em>**kwargs</em><big>)</big><a class="reference internal" href="_modules/pyssy.html#article"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pyssy.article" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="pyssy.before_request">
+<tt class="descclassname">pyssy.</tt><tt class="descname">before_request</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/pyssy.html#before_request"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pyssy.before_request" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="pyssy.board">
+<tt class="descclassname">pyssy.</tt><tt class="descname">board</tt><big>(</big><em>*args</em>, <em>**kwargs</em><big>)</big><a class="reference internal" href="_modules/pyssy.html#board"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pyssy.board" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="pyssy.calcscore">
+<tt class="descclassname">pyssy.</tt><tt class="descname">calcscore</tt><big>(</big><em>art</em>, <em>other</em>, <em>maxp</em><big>)</big><a class="reference internal" href="_modules/pyssy.html#calcscore"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pyssy.calcscore" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="pyssy.datetime2str">
+<tt class="descclassname">pyssy.</tt><tt class="descname">datetime2str</tt><big>(</big><em>dt</em><big>)</big><a class="reference internal" href="_modules/pyssy.html#datetime2str"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pyssy.datetime2str" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="pyssy.fetch">
+<tt class="descclassname">pyssy.</tt><tt class="descname">fetch</tt><big>(</big><em>url</em>, <em>timeout</em><big>)</big><a class="reference internal" href="_modules/pyssy.html#fetch"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pyssy.fetch" title="Permalink to this definition">¶</a></dt>
+<dd><p>Use Memcached in SAE or Redis locally
+Redis only support String, so convert before/after store</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="pyssy.hello">
+<tt class="descclassname">pyssy.</tt><tt class="descname">hello</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/pyssy.html#hello"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pyssy.hello" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="pyssy.rest_article">
+<tt class="descclassname">pyssy.</tt><tt class="descname">rest_article</tt><big>(</big><em>board</em>, <em>file_</em><big>)</big><a class="reference internal" href="_modules/pyssy.html#rest_article"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pyssy.rest_article" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="pyssy.rest_board">
+<tt class="descclassname">pyssy.</tt><tt class="descname">rest_board</tt><big>(</big><em>b</em><big>)</big><a class="reference internal" href="_modules/pyssy.html#rest_board"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pyssy.rest_board" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="pyssy.rest_thread">
+<tt class="descclassname">pyssy.</tt><tt class="descname">rest_thread</tt><big>(</big><em>board</em>, <em>reid</em><big>)</big><a class="reference internal" href="_modules/pyssy.html#rest_thread"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pyssy.rest_thread" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="pyssy.soupdump">
+<tt class="descclassname">pyssy.</tt><tt class="descname">soupdump</tt><big>(</big><em>var</em><big>)</big><a class="reference internal" href="_modules/pyssy.html#soupdump"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pyssy.soupdump" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="pyssy.str2datetime">
+<tt class="descclassname">pyssy.</tt><tt class="descname">str2datetime</tt><big>(</big><em>st</em><big>)</big><a class="reference internal" href="_modules/pyssy.html#str2datetime"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pyssy.str2datetime" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="pyssy.teardown_request">
+<tt class="descclassname">pyssy.</tt><tt class="descname">teardown_request</tt><big>(</big><em>exception</em><big>)</big><a class="reference internal" href="_modules/pyssy.html#teardown_request"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pyssy.teardown_request" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="pyssy.thread">
+<tt class="descclassname">pyssy.</tt><tt class="descname">thread</tt><big>(</big><em>*args</em>, <em>**kwargs</em><big>)</big><a class="reference internal" href="_modules/pyssy.html#thread"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pyssy.thread" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="pyssy.tree">
+<tt class="descclassname">pyssy.</tt><tt class="descname">tree</tt><big>(</big><em>url</em><big>)</big><a class="reference internal" href="_modules/pyssy.html#tree"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pyssy.tree" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="pyssy.treehtml">
+<tt class="descclassname">pyssy.</tt><tt class="descname">treehtml</tt><big>(</big><em>art</em><big>)</big><a class="reference internal" href="_modules/pyssy.html#treehtml"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pyssy.treehtml" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="pyssy.url_article">
+<tt class="descclassname">pyssy.</tt><tt class="descname">url_article</tt><big>(</big><em>url</em><big>)</big><a class="reference internal" href="_modules/pyssy.html#url_article"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pyssy.url_article" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="pyssy.url_board">
+<tt class="descclassname">pyssy.</tt><tt class="descname">url_board</tt><big>(</big><em>url</em><big>)</big><a class="reference internal" href="_modules/pyssy.html#url_board"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pyssy.url_board" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="pyssy.url_thread">
+<tt class="descclassname">pyssy.</tt><tt class="descname">url_thread</tt><big>(</big><em>url</em><big>)</big><a class="reference internal" href="_modules/pyssy.html#url_thread"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pyssy.url_thread" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</div>
+<div class="toctree-wrapper compound">
+<ul class="simple">
+</ul>
+</div>
+</div>
+<div class="section" id="indices-and-tables">
+<h1>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Permalink to this headline">¶</a></h1>
+<ul class="simple">
+<li><a class="reference internal" href="genindex.html"><em>Index</em></a></li>
+<li><a class="reference internal" href="py-modindex.html"><em>Module Index</em></a></li>
+<li><a class="reference internal" href="search.html"><em>Search Page</em></a></li>
+</ul>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="#">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Pyssy</a><ul>
+<li><a class="reference internal" href="#id1">簡介</a></li>
+<li><a class="reference internal" href="#id3">依賴項</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#indices-and-tables">Indices and tables</a></li>
+</ul>
+
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="_sources/index.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="#">Pyssy 6 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2012, Jiachen Yang.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1.3.
+    </div>
+  </body>
+</html>

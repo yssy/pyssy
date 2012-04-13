@@ -48,7 +48,8 @@ import datetime
 import time
 from urllib2 import urlopen
 
-from BeautifulSoup import BeautifulSoup as BS
+from bs4 import BeautifulSoup as BS
+import html5lib
 
 from flask import (Flask, g, request, abort, redirect,
                    url_for, render_template, Markup, flash, Response)
@@ -59,7 +60,7 @@ from iso8601 import parse_date
 app = Flask(__name__)
 app.debug = True
 
-VERSION = 6
+VERSION = 7
 
 app.config[u'VERSION'] = VERSION
 
@@ -194,7 +195,7 @@ class api(object):
             if modified_since == fetch_time:
                 return Response(status=304)
             
-            result, xml_list_names = func(html)
+            result, xml_list_names = func(BS(html,'html5lib'))
             
             roottag = func.__name__
             
@@ -283,9 +284,8 @@ def url_article(url):
     return article(url=url)
 
 @api(16)
-def article(html):
+def article(soup):
     result = {}
-    soup = BS(html)
     
     result[u'page_title'] = soup.title
     body = soup.body.center
@@ -446,10 +446,9 @@ def rest_board(b):
         url = u'bbsdoc?board=%s'%(board_)
     return board(url=url)
 @api(2)
-def board(html):
+def board(soup):
     result = {}
     
-    soup = BS(html)
     result[u'board'] = soup.body(u'input', type=u'hidden')[0][u'value']
     title = soup.body.table.tr.font.b.string
     result[u'title'] = title
@@ -501,9 +500,9 @@ def board(html):
 
     district = table2[1].string
     result[u'district'] = {u'name':district, u'char':district[0]}
-    #return ({u'r':[unicode(x) for x in nobr.contents]},{},u'debug')
+    #return ({u'r':[unicode(tr) for tr in nobr.contents[6].table('tr')]},{})
     
-    articles = [tr for tr in nobr.contents[6].table][3:] # 前面三项是\n, 标题, \n
+    articles = [tr for tr in nobr.contents[6].table('tr')][3:] # 前面三项是\n, 标题, \n
     result[u'articles'] = []
     result[u'fixed_articles'] = []
     for art in articles:
@@ -622,9 +621,8 @@ def api_thread():
     return thread(url=url)
 
 @api(2)
-def thread(html):
+def thread(soup):
     result = {}
-    soup = BS(html)
     center = soup.center.contents
     
     result[u'page_title'] = center[0]
@@ -683,9 +681,8 @@ def api_bbsall():
     return bbsall(url=url,format=format)
 
 @api(3600)
-def bbsall(html):
+def bbsall(soup):
     result = {}
-    soup = BS(html)
     center = soup.center
     
     result['count'] = int(re.findall(u'\[讨论区数: (\\d+)\]',center.contents[2])[0])
@@ -717,9 +714,8 @@ def api_user():
     return user(url=url)
 
 @api(3600)
-def user(html):
+def user(soup):
     result = {}
-    soup = BS(html)
     center = soup.center
     
     if len(center(u'table')) == 0:
