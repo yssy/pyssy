@@ -105,7 +105,7 @@ def fetch(url, timeout):
         g.mc.set('time'+url.encode('ascii'), now)
         return (html, now)
     else:
-        return (urlopen(URLBASE + url).read().decode("gbk","ignore"), datetime2str(datetime.now()))
+        return (urlopen(URLBASE + url).read().decode("gbk","ignore"), datetime2str(datetime.datetime.now()))
 
 @app.before_request
 def before_request():
@@ -144,6 +144,8 @@ def soupdump(var):
         return var
     if isinstance(var, float):
         return var
+	if hasattr(var,'stripped_strings'):
+	    return u''.join(var.stripped_strings)
     if hasattr(var,'string'):
         return unicode(var.string)
     else:
@@ -366,6 +368,7 @@ def article(soup):
     result[u'content'] = {
         u'author': content.a ,
         u'author_link': content.a[u'href'] ,
+        u'nick'  : content_lines[0][content_lines[0].find('(')+1:content_lines[0].rfind(')')],
         u'board' : content_lines[0][content_lines[0].rfind(' ') + 1:] ,
         u'title' : content_lines[1][6:] ,
         u'datetime_str' : datetime_str ,
@@ -520,7 +523,16 @@ def board(soup):
         datetime_str = art_list[3].string
         current_year = str(datetime.datetime.now().year)+datetime_str
         datetime_ = datetime.datetime.strptime(current_year,'%Y%b %d %H:%M')
+        
+        tit = art_list[4].a
+        if tit.font != None:
+            cannot_re = tit.font['color']
+            tit = list(tit.strings)[1]
+        else:
+            cannot_re = ''
+
         article = {
+            #u'list': [unicode(x) for x in art_list],
             u'id': art_list[0],
             u'mark': mark,
             u'author': art_list[2].a,
@@ -528,12 +540,13 @@ def board(soup):
             u'datetime_ctime': datetime_.ctime(),
             u'datetime_tuple': tuple(datetime_.timetuple()[:6]),
             u'datetime_epoch': repr(time.mktime(datetime_.timetuple())),
-            u'title': art_list[4].a,
+            u'title': tit,
             u'link': link,
             u'file': file_,
             u'file_id': file_id,
             u'words_str': words_str,
-            u'words' : words
+            u'words' : words,
+            u'cannot_re': cannot_re,
         }
         
         font = article[u'id'](u'font') 
