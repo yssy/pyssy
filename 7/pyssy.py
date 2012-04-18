@@ -144,8 +144,8 @@ def soupdump(var):
         return var
     if isinstance(var, float):
         return var
-	if hasattr(var,'stripped_strings'):
-	    return u''.join(var.stripped_strings)
+    if hasattr(var,'stripped_strings'):
+        return u''.join(var.stripped_strings)
     if hasattr(var,'string'):
         return unicode(var.string)
     else:
