@@ -10,14 +10,34 @@ Pyssy 是一系列用於 `上海交通大學 飲水思源站 <http://bbs.sjtu.ed
 Pyssy 既可以寄宿在Sina App Engine上，也可以單獨使用。
 
 ----------
-依賴項
+外部依賴項
 ----------
 
-==========  ======================================================
-Flask        Pyssy使用Flask作爲網頁服務框架。
-pylibmc      託管在SAE上的Pyssy使用pylibmc訪問SAE的memcached服務。
-Redis-py     獨立運行的Pyssy使用Redis作爲memcached服務的替代。
-==========  ======================================================
+Pyssy依賴於以下這些獨立於Python之外的服務。當然Pyssy也依賴於Python。
+由於寄宿在SAE上，目前支持Python 2.6, 2.7以及PyPy 1.6以上。
+
+========== ============ =======================================================
+PyPI模塊    Unix程序          功能說明
+========== ============ =======================================================
+pylibmc     memcached    託管在SAE上的Pyssy使用pylibmc訪問SAE的memcached服務。
+Redis-py    redis        獨立運行的Pyssy使用Redis作爲memcached服務的替代。
+========== ============ =======================================================
+
+-----------
+內部依賴項
+-----------
+Pyssy內部依賴於這些額外的Python模塊
+
+================== =====================================   ======================
+模塊名              功能說明                                包含於源代碼樹中？
+================== =====================================   ======================
+Flask               Pyssy使用Flask作爲網頁服務框架。        否
+BeautifulSoup 4     HTML解析框架。                          是 
+html5lib            HTML parser。                           是
+iso8601             日期格式解析。                          是
+dict2xml            XML格式輸出。                           是
+================== =====================================   ======================
+
 '''
 
 try:
@@ -41,7 +61,6 @@ except:
         REDIS_MC = True
     except:
         REDIS_MC = False
-
 
 import json, re
 import datetime
@@ -85,8 +104,8 @@ def datetime2str(dt):
 
 def fetch(url, timeout):
     '''
-    Use Memcached in SAE or Redis locally
-    Redis only support String, so convert before/after store
+    在SAE上採用Memcached，在本地測試時採用Redis。
+    雖然Memcached支持更複雜的數據結構，不過Redis只支持字符串的存取，所以統一使用字符串。
     '''
     now = datetime2str(str2datetime(datetime2str(datetime.datetime.now())))
     if timeout > 0 and hasattr(g,'mc'):

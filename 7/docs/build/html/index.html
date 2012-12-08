@@ -8,7 +8,7 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     
-    <title>Pyssy &mdash; Pyssy 6 documentation</title>
+    <title>Pyssy &mdash; Pyssy 7 documentation</title>
     
     <link rel="stylesheet" href="_static/default.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
@@ -16,7 +16,7 @@
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
         URL_ROOT:    '',
-        VERSION:     '6',
+        VERSION:     '7',
         COLLAPSE_INDEX: false,
         FILE_SUFFIX: '.html',
         HAS_SOURCE:  true
@@ -25,7 +25,7 @@
     <script type="text/javascript" src="_static/jquery.js"></script>
     <script type="text/javascript" src="_static/underscore.js"></script>
     <script type="text/javascript" src="_static/doctools.js"></script>
-    <link rel="top" title="Pyssy 6 documentation" href="#" /> 
+    <link rel="top" title="Pyssy 7 documentation" href="#" /> 
   </head>
   <body>
     <div class="related">
@@ -37,7 +37,7 @@
         <li class="right" >
           <a href="py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li><a href="#">Pyssy 6 documentation</a> &raquo;</li> 
+        <li><a href="#">Pyssy 7 documentation</a> &raquo;</li> 
       </ul>
     </div>  
 
@@ -54,21 +54,68 @@
 <p>Pyssy 既可以寄宿在Sina App Engine上，也可以單獨使用。</p>
 </div>
 <div class="section" id="id3">
-<h2>依賴項<a class="headerlink" href="#id3" title="Permalink to this headline">¶</a></h2>
+<h2>外部依賴項<a class="headerlink" href="#id3" title="Permalink to this headline">¶</a></h2>
+<p>Pyssy依賴於以下這些獨立於Python之外的服務。當然Pyssy也依賴於Python。
+由於寄宿在SAE上，目前支持Python 2.6, 2.7以及PyPy 1.6以上。</p>
 <table border="1" class="docutils">
 <colgroup>
+<col width="13%" />
 <col width="16%" />
-<col width="84%" />
+<col width="71%" />
 </colgroup>
-<tbody valign="top">
-<tr class="row-odd"><td>Flask</td>
-<td>Pyssy使用Flask作爲網頁服務框架。</td>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">PyPI模塊</th>
+<th class="head">Unix程序</th>
+<th class="head">功能說明</th>
 </tr>
+</thead>
+<tbody valign="top">
 <tr class="row-even"><td>pylibmc</td>
+<td>memcached</td>
 <td>託管在SAE上的Pyssy使用pylibmc訪問SAE的memcached服務。</td>
 </tr>
 <tr class="row-odd"><td>Redis-py</td>
+<td>redis</td>
 <td>獨立運行的Pyssy使用Redis作爲memcached服務的替代。</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="id4">
+<h2>內部依賴項<a class="headerlink" href="#id4" title="Permalink to this headline">¶</a></h2>
+<p>Pyssy內部依賴於這些額外的Python模塊</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="23%" />
+<col width="48%" />
+<col width="29%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">模塊名</th>
+<th class="head">功能說明</th>
+<th class="head">包含於源代碼樹中？</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>Flask</td>
+<td>Pyssy使用Flask作爲網頁服務框架。</td>
+<td>否</td>
+</tr>
+<tr class="row-odd"><td>BeautifulSoup 4</td>
+<td>HTML解析框架。</td>
+<td>是</td>
+</tr>
+<tr class="row-even"><td>html5lib</td>
+<td>HTML parser。</td>
+<td>是</td>
+</tr>
+<tr class="row-odd"><td>iso8601</td>
+<td>日期格式解析。</td>
+<td>是</td>
+</tr>
+<tr class="row-even"><td>dict2xml</td>
+<td>XML格式輸出。</td>
+<td>是</td>
 </tr>
 </tbody>
 </table>
@@ -83,6 +130,11 @@
 <dd></dd></dl>
 
 <dl class="function">
+<dt id="pyssy.api_bbsall">
+<tt class="descclassname">pyssy.</tt><tt class="descname">api_bbsall</tt><big>(</big><big>)</big><a class="headerlink" href="#pyssy.api_bbsall" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
 <dt id="pyssy.api_board">
 <tt class="descclassname">pyssy.</tt><tt class="descname">api_board</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/pyssy.html#api_board"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pyssy.api_board" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
@@ -93,13 +145,28 @@
 <dd></dd></dl>
 
 <dl class="function">
+<dt id="pyssy.api_user">
+<tt class="descclassname">pyssy.</tt><tt class="descname">api_user</tt><big>(</big><big>)</big><a class="headerlink" href="#pyssy.api_user" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
 <dt id="pyssy.article">
 <tt class="descclassname">pyssy.</tt><tt class="descname">article</tt><big>(</big><em>*args</em>, <em>**kwargs</em><big>)</big><a class="reference internal" href="_modules/pyssy.html#article"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pyssy.article" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="function">
+<dt id="pyssy.bbsall">
+<tt class="descclassname">pyssy.</tt><tt class="descname">bbsall</tt><big>(</big><em>*args</em>, <em>**kwargs</em><big>)</big><a class="headerlink" href="#pyssy.bbsall" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
 <dt id="pyssy.before_request">
 <tt class="descclassname">pyssy.</tt><tt class="descname">before_request</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/pyssy.html#before_request"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pyssy.before_request" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="pyssy.bmreason">
+<tt class="descclassname">pyssy.</tt><tt class="descname">bmreason</tt><big>(</big><big>)</big><a class="headerlink" href="#pyssy.bmreason" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="function">
@@ -120,8 +187,8 @@
 <dl class="function">
 <dt id="pyssy.fetch">
 <tt class="descclassname">pyssy.</tt><tt class="descname">fetch</tt><big>(</big><em>url</em>, <em>timeout</em><big>)</big><a class="reference internal" href="_modules/pyssy.html#fetch"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pyssy.fetch" title="Permalink to this definition">¶</a></dt>
-<dd><p>Use Memcached in SAE or Redis locally
-Redis only support String, so convert before/after store</p>
+<dd><p>在SAE上採用Memcached，在本地測試時採用Redis。
+雖然Memcached支持更複雜的數據結構，不過Redis只支持字符串的存取，所以統一使用字符串。</p>
 </dd></dl>
 
 <dl class="function">
@@ -189,6 +256,11 @@ Redis only support String, so convert before/after store</p>
 <tt class="descclassname">pyssy.</tt><tt class="descname">url_thread</tt><big>(</big><em>url</em><big>)</big><a class="reference internal" href="_modules/pyssy.html#url_thread"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pyssy.url_thread" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
+<dl class="function">
+<dt id="pyssy.user">
+<tt class="descclassname">pyssy.</tt><tt class="descname">user</tt><big>(</big><em>*args</em>, <em>**kwargs</em><big>)</big><a class="headerlink" href="#pyssy.user" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
 </div>
 <div class="toctree-wrapper compound">
 <ul class="simple">
@@ -214,7 +286,8 @@ Redis only support String, so convert before/after store</p>
   <ul>
 <li><a class="reference internal" href="#">Pyssy</a><ul>
 <li><a class="reference internal" href="#id1">簡介</a></li>
-<li><a class="reference internal" href="#id3">依賴項</a></li>
+<li><a class="reference internal" href="#id3">外部依賴項</a></li>
+<li><a class="reference internal" href="#id4">內部依賴項</a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#indices-and-tables">Indices and tables</a></li>
@@ -251,7 +324,7 @@ Redis only support String, so convert before/after store</p>
         <li class="right" >
           <a href="py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li><a href="#">Pyssy 6 documentation</a> &raquo;</li> 
+        <li><a href="#">Pyssy 7 documentation</a> &raquo;</li> 
       </ul>
     </div>
     <div class="footer">
