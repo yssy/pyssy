@@ -65,7 +65,8 @@ except:
 import json, re
 import datetime
 import time
-from urllib2 import urlopen
+import urllib2
+import urllib
 
 from bs4 import BeautifulSoup as BS
 import html5lib
@@ -76,6 +77,7 @@ from flask import (Flask, g, request, abort, redirect,
 from dict2xml import dict2xml
 from iso8601 import parse_date
 
+
 app = Flask(__name__)
 app.debug = True
 
@@ -84,22 +86,44 @@ VERSION = 7
 app.config[u'VERSION'] = VERSION
 
 
-URLBASE="http://bbs.sjtu.edu.cn/"
-URLTHREAD=URLBASE+"bbstfind0?"
-URLARTICLE=URLBASE+"bbscon?"
-URLTHREADALL="bbstcon"
-URLTHREADFIND="bbstfind"
+URLBASE = "https://bbs.sjtu.edu.cn/"
+URLTHREAD = URLBASE+"bbstfind0?"
+URLARTICLE = URLBASE+"bbscon?"
+URLTHREADALL = "bbstcon"
+URLTHREADFIND = "bbstfind"
+
+
+
 
 def str2datetime(st):
-    if st == None:
+    if st is None:
         return None
     return parse_date(st)
 
+
 def datetime2str(dt):
-    if dt==None:
+    if dt is None:
         return None
     return dt.isoformat()
 
+
+def login_opener():
+    opener = None
+    try:
+        from cookielib import CookieJar
+        from secret_settings import USERNAME, PASSWORD
+        cj = CookieJar()
+        opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
+        # input-type values from the html form
+        formdata = { "id" : USERNAME, "pw": PASSWORD }
+        data_encoded = urllib.urlencode(formdata)
+        response = opener.open("https://bbs.sjtu.edu.cn/bbslogin", data_encoded)
+        content = response.read()
+    except:
+        opener = urllib2.build_opener()
+    return opener
+
+openner = None
 
 
 def fetch(url, timeout):
@@ -107,24 +131,29 @@ def fetch(url, timeout):
     在SAE上採用Memcached，在本地測試時採用Redis。
     雖然Memcached支持更複雜的數據結構，不過Redis只支持字符串的存取，所以統一使用字符串。
     '''
+    global openner
     now = datetime2str(str2datetime(datetime2str(datetime.datetime.now())))
-    if timeout > 0 and hasattr(g,'mc'):
+    if openner is None:
+        openner = login_opener()
+    if timeout > 0 and hasattr(g, 'mc'):
         result = g.mc.get(url.encode('ascii'))
         if result:
-            result = result.decode("gbk","ignore")
+            result = result.decode("gbk", "ignore")
             result_time = str2datetime(g.mc.get('time'+url.encode('ascii')))
             if result_time:
                 expired = (str2datetime(now) - result_time) > datetime.timedelta(seconds=timeout)
                 if not expired:
                     return (result, datetime2str(result_time))
-        html = urlopen(URLBASE + url).read().decode("gbk","ignore")
-        if result == html and result_time != None:
+        html = openner.open(URLBASE + url).read().decode("gbk", "ignore")
+        if result == html and result_time is not None:
             return (result, datetime2str(result_time))
-        g.mc.set(url.encode('ascii'), html.encode("gbk","ignore"))
+        g.mc.set(url.encode('ascii'), html.encode("gbk", "ignore"))
         g.mc.set('time'+url.encode('ascii'), now)
         return (html, now)
     else:
-        return (urlopen(URLBASE + url).read().decode("gbk","ignore"), datetime2str(datetime.datetime.now()))
+        return (openner.open(URLBASE + url).read().decode("gbk", "ignore"),
+                datetime2str(datetime.datetime.now()))
+
 
 @app.before_request
 def before_request():
@@ -133,23 +162,35 @@ def before_request():
         g.mc = pylibmc.Client()
     elif REDIS_MC:
         g.mc = StrictRedis()
-    
-    
+
 
 @app.teardown_request
 def teardown_request(exception):
-    if hasattr(g, 'db'): g.db.close()
-
+    if hasattr(g, 'db'):
+        g.db.close()
 
 
 @app.route('/')
 def hello():
-    html= u"""
+    html = u"""
         <p>欢迎使用pyssy工具。</p>
         <p>请将水源的网址中http://bbs.sjtu.edu.cn/ 替换为 http://pyssy.sinasae.com/&lt;service&gt;/ </p>
-        <p>目前支持的service有： tree —— 树状主题列表</p>
-        """ 
+        <p>目前支持的service有： tree —— 树状主题列表 </p>
+        <p> REDIS_MC %s </p>
+        """ % REDIS_MC
     return render_template('template.html',body=html)
+
+
+@app.route("/login")
+def logintest():
+    cj = CookieJar()
+    opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
+    # input-type values from the html form
+    formdata = {"id": USERNAME, "pw": PASSWORD}
+    data_encoded = urllib.urlencode(formdata)
+    response = opener.open("https://bbs.sjtu.edu.cn/bbslogin", data_encoded)
+    content = response.read()
+    return content
 
 
 def soupdump(var):
@@ -170,10 +211,11 @@ def soupdump(var):
     else:
         return unicode(var)
 
+
 class api(object):
     def __init__(self, timeout):
         self.timeout = timeout
-        
+
     def __call__(self, func):
         def wrap(*args, **kwargs):
             if 'format' in request.values:
@@ -200,7 +242,7 @@ class api(object):
             if 'include'  in kwargs: include     = kwargs['include']
             
             if not format in [u'json', u'xml', u'jsonp', u'raw']:
-                return u'Format "%s" not supported! Use "json" or "xml".'%format
+                return u'Format "%s" not supported! Use "json" or "xml".' % format
             if format == u'json' and callback != u'':
                 format = u'jsonp'
             
@@ -222,7 +264,7 @@ class api(object):
             
             if include and u'articles' in result:
                 for artlink in result[u'articles']:
-                    art,xl = article(url=artlink[u'link'], format=u'raw')
+                    art, xl = article(url=artlink[u'link'], format=u'raw')
                     artlink[u'include'] = art
                     xml_list_names.update(xl)
             
@@ -260,9 +302,9 @@ class api(object):
             else:
                 if pretty:
                     json_result = json.dumps(result,
-                        ensure_ascii = False, sort_keys=True, indent=4)
+                        ensure_ascii=False, sort_keys=True, indent=4)
                 else:
-                    json_result = json.dumps(result, ensure_ascii = False)
+                    json_result = json.dumps(result, ensure_ascii=False)
                 if callback != '':
                     return Response('%s([%s]);'%(callback, json_result), 
                         headers=headers,
@@ -272,6 +314,8 @@ class api(object):
                         headers=headers,
                         content_type='application/json; charset=utf-8')
         return wrap
+
+
 @app.route(u'/api/article/<board>/<file_>', methods=[u'GET', u'POST'])
 def rest_article(board, file_):
     ext = file_[file_.rindex(u'.')+1:]
@@ -280,10 +324,11 @@ def rest_article(board, file_):
         file_ = file_[:file_.rindex(u'.')]
     else:
         format = 'json'
-    
-    url = u'bbscon?board=%s&file=%s'%(board, file_)
+
+    url = u'bbscon?board=%s&file=%s' % (board, file_)
     return article(url=url, format=format)
-    
+
+
 @app.route(u'/api/article', methods=[u'GET', u'POST'])
 def api_article():
     if 'url' in request.values:
@@ -291,18 +336,19 @@ def api_article():
     else:
         file_ = request.values[u'file']
         board = request.values[u'board']
-        url = u'bbscon?board=%s&file=%s'%(board, file_)
+        url = u'bbscon?board=%s&file=%s' % (board, file_)
 
     url = url[url.rfind(u'/') + 1:]
     return article(url=url)
+
 
 @app.route('/article/<path:url>', methods=['GET', 'POST'])
 @app.route('/article', methods=['GET', 'POST'])
 def url_article(url):
     url = request.url
-    
     url = url[url.rfind(u'/') + 1:]
     return article(url=url)
+
 
 @api(16)
 def article(soup):
@@ -335,8 +381,7 @@ def article(soup):
     content_lines = content_raw.split(u'\n')
     result[u'content_lines'] = content_lines
     datetime_str = unicode(content_lines[2])[11:30]
-    
-    datetime_tuple = [ int(datetime_str[0:4]),
+    datetime_tuple = [int(datetime_str[0:4]),
                         int(datetime_str[5:7]),
                         int(datetime_str[8:10]),
                         int(datetime_str[11:13]),
@@ -351,7 +396,10 @@ def article(soup):
         
     from_lines = filter(lambda x:x != '',content_lines[from_index:])
     if len(from_lines)>0:
-        from_ip = re.findall(u'\[FROM: ([\w\.:]*)\]',from_lines[0])[0]
+        try:
+            from_ip = re.findall(u'\[FROM: ([\w\.:]*)\]',from_lines[0])[0]
+        except:
+            from_ip = ""
     else:
         from_ip = ''
     edit_times = len(from_lines) - 1 # 来自那行,和最后</font>的一行
@@ -414,6 +462,8 @@ def article(soup):
     }
 
     return (result, xml_list_names)
+
+
 @app.route(u'/api/board', methods=[u'GET', u'POST'])
 def api_board():
     if 'url' in request.values:
@@ -432,8 +482,8 @@ def api_board():
         else:
             page = 'latest'
             url = u'bbsdoc?board=%s'%(board_)
-    
     return board(url=url)
+
 
 @app.route(u'/board/<path:url>', methods=[u'GET', u'POST'])
 @app.route(u'/board', methods=[u'GET', u'POST'])
@@ -529,7 +579,11 @@ def board(soup):
     result[u'fixed_articles'] = []
     for art in articles:
         art_list = [item for item in art]
-        words_str = [string for string in art_list[4].contents][2].string
+        title_and_words = [string for string in art_list[4].contents] 
+        if len(title_and_words) > 2: # 标题，左括号，字数，右括号
+            words_str = title_and_words[2].string  
+        else: # 标题, <font> 左括号，字数，右括号 </font>
+            words_str = title_and_words[1].contents[1].string  
         if words_str[-1] == 'K':
             words = int(float(words_str[:-1])*1000)
         else:
@@ -545,8 +599,11 @@ def board(soup):
         
         tit = art_list[4].a
         if tit.font != None:
-            cannot_re = tit.font['color']
-            tit = list(tit.strings)[1]
+            if tit.font['class']: # 标题有颜色
+                tit = list(tit.strings)[1]
+            else: # 有不可re属性
+                cannot_re = tit.font['color']
+                tit = list(tit.strings)[1]
         else:
             cannot_re = ''
 
@@ -632,7 +689,8 @@ def rest_thread(board, reid):
 
     url = u'bbstfind0?board=%s&reid=%s'%(board, reid)
     return thread(url=url)
-    
+
+
 @app.route('/thread/<path:url>', methods=['GET', 'POST'])
 @app.route('/thread', methods=['GET', 'POST'])
 def url_thread(url):
@@ -640,6 +698,7 @@ def url_thread(url):
 
     url = url[url.rfind(u'/') + 1:]
     return thread(url=url)
+
 
 @app.route(u'/api/thread', methods=[u'GET', u'POST'])
 def api_thread():
@@ -651,6 +710,7 @@ def api_thread():
         url = u'bbstfind0?board=%s&reid=%s'%(board, reid)
     url = url[url.rfind(u'/') + 1:]
     return thread(url=url)
+
 
 @api(2)
 def thread(soup):
@@ -689,9 +749,9 @@ def thread(soup):
     result[u'count'] = int(re.findall(u'共找到 ([0-9]+) 篇',center[6])[0])
     result[u'board_link'] = center[7][u'href']
     result[u'bbstcon_link'] = center[9][u'href']
-    
-
     return (result,{'datetime_tuple':'int','articles':'article'})
+
+
 @app.route(u'/api/bbsall.jsonp', methods=[u'GET', u'POST'])
 @app.route(u'/api/bbsall.json', methods=[u'GET', u'POST'])
 @app.route(u'/api/bbsall.xml', methods=[u'GET', u'POST'])
@@ -876,6 +936,31 @@ def bmreason():
             results[x] = threads[x]
 
     return '\n'.join('%s:%s'%(x,','.join(results[x])) for x in results)
+
+
+@app.route("/ebm")
+def bestbm():
+    fp, lp = 826, 1028
+
+    allpages = []
+    for page in xrange(fp, lp+1):
+        boardpage = board(url="bbsdoc?board=BMLogs&page="+str(page), pretty=1, format="raw")[0]
+        d3arts = [x for x in boardpage["articles"] if x["title"].endswith(u"3区昨日板务操作记录")]
+        allpages.extend(d3arts)
+    return "<pre>%s</pre>" % (
+        json.dumps(allpages, ensure_ascii=False, sort_keys=True, indent=4))
+
+@app.route("/ebmall")
+def ebmall():
+    alllinks  = open("links.txt").read().split("\n")
+    result = []
+    for link in alllinks:
+        if link.strip() == "":
+            continue
+        art = article(url=link, format="raw")[0]["content"]
+        result.append("\n".join(art["text_lines"][2:]))
+    return "<pre>%s</pre>" % "\n".join(result)
+
 if __name__ == '__main__':
     app.run()
 #########################################################################
