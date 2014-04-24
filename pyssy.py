@@ -317,15 +317,6 @@ def api_article():
     url = url[url.rfind(u'/') + 1:]
     return article(url=url)
 
-
-@app.route('/article/<path:url>', methods=['GET', 'POST'])
-@app.route('/article', methods=['GET', 'POST'])
-def url_article(url):
-    url = request.url
-    url = url[url.rfind(u'/') + 1:]
-    return article(url=url)
-
-
 @api(16)
 def article(soup):
     result = {}
@@ -398,7 +389,7 @@ def article(soup):
     if reply_index == -1:
         reply_index = qmd_index
     if reply_index != -1:
-        reply_lines = content_lines[reply_index : qmd_index] 
+        reply_lines = content_lines[reply_index : qmd_index]
         for i in range(1,len(reply_lines)):
             if len(re.findall(u'<font color="808080">: (.*)$',reply_lines[i])) > 0:
                 reply_lines[i] = re.findall(
@@ -460,14 +451,6 @@ def api_board():
             url = u'bbsdoc?board=%s'%(board_)
     return board(url=url)
 
-
-@app.route(u'/board/<path:url>', methods=[u'GET', u'POST'])
-@app.route(u'/board', methods=[u'GET', u'POST'])
-def url_board(url):
-    url = request.url
-    url = url[url.rfind(u'/') + 1:]
-    return board(url=url)
-
 @app.route('/api/board/<b>', methods=['GET', 'POST'])
 def rest_board(b):
     if u'.' in b:
@@ -493,6 +476,7 @@ def rest_board(b):
         page = 'latest'
         url = u'bbsdoc?board=%s'%(board_)
     return board(url=url)
+
 @api(2)
 def board(soup):
     result = {}
@@ -667,15 +651,6 @@ def rest_thread(board, reid):
     return thread(url=url)
 
 
-@app.route('/thread/<path:url>', methods=['GET', 'POST'])
-@app.route('/thread', methods=['GET', 'POST'])
-def url_thread(url):
-    url = request.url
-
-    url = url[url.rfind(u'/') + 1:]
-    return thread(url=url)
-
-
 @app.route(u'/api/thread', methods=[u'GET', u'POST'])
 def api_thread():
     if 'url' in request.values:
@@ -822,90 +797,6 @@ def user(soup):
     pre = center.pre
     result['pre'] = unicode(pre)
     return (result,{})
-def treehtml(art):
-    replies = []
-    art[u'replies'].sort(key = lambda x:float(x[u'content'][u'datetime_epoch']))
-    for reply in art[u'replies']:
-        replies.append(treehtml(reply))
-    return render_template(u'treeart.html',
-        article=art, replies=replies, 
-        content_lines = u'\n'.join(art[u'content_lines']),
-        baseurl = URLBASE)
-
-def calcscore(art, other, maxp):
-    from difflib import get_close_matches
-    score = 0
-    for line in art[u'reply_lines']:
-        for otherline in (other[u'text_lines']):
-            l1 = len(line)
-            l2 = len(otherline)
-            l = l1 if l1 < l2 else l2
-            if len(set(line).intersection(otherline)) > l/2:
-                score += 1
-    return score
-
-@app.route(u"/tree/<path:url>")
-@app.route(u"/tree")
-def tree(url):
-    url=request.url
-    url=url[url.rfind(u'/')+1:]
-    from time import clock
-    start=clock()
-
-    thread_json,xl = thread(url=url, format=u'raw', callback=u'', pretty=False)
-    threads = []
-    index = 0
-    for art in thread_json[u'articles']:
-        art_json,xl = article(url=art[u'link'], format=u'raw', callback=u'', pretty=False)
-        art_json['text_lines'] = []
-        for line in art_json['content']['text_lines']:
-            while len(line)>80:
-                art_json['text_lines'].append(line[:80])
-                line = line[80:]
-            if len(line.strip()) > 0:
-                art_json['text_lines'].append(line)
-                
-        art_json['reply_lines'] = []
-        for line in art_json['content']['reply_lines']:
-            while len(line)>80:
-                art_json['reply_lines'].append(line[:80])
-                line = line[80:]
-            art_json['reply_lines'].append(line)
-        
-        art_json[u'replies'] = []
-        art_json[u'index'] = index
-        index += 1
-        threads.append(art_json)
-        
-    maxp = len(threads)
-    
-    for art in threads:
-        max_score = 0
-        max_refer = None
-        for other in threads:
-            if other['index'] == art['index']:
-                continue
-            score = calcscore(art, other, maxp)
-            if score > max_score:
-                max_score = score
-                max_refer = other
-        art[u'refer'] = max_refer
-        art[u'score'] = max_score
-        if max_refer != None:
-            max_refer[u'replies'].append(art)
-    
-    for art in threads[1:]:
-        if art[u'refer'] == None:
-            art[u'refer'] = threads[0]
-            threads[0][u'replies'].append(art)
-    
-    end=clock()
-    
-    #ans = []
-    #for art in threads[1:]:
-    #    ans.append('%s -> %s'%(art[u'index'],art[u'refer'][u'index']))
-    #return '<br/>'.join(ans)
-    return render_template('treeyssy.html',treehtml = treehtml(threads[0]),thread = thread_json, time = end - start)
 
 
 if __name__ == '__main__':
