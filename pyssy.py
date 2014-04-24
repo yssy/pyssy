@@ -107,23 +107,11 @@ def datetime2str(dt):
     return dt.isoformat()
 
 
-def login_opener():
-    opener = None
-    try:
-        from cookielib import CookieJar
-        from secret_settings import USERNAME, PASSWORD
-        cj = CookieJar()
-        opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
-        # input-type values from the html form
-        formdata = { "id" : USERNAME, "pw": PASSWORD }
-        data_encoded = urllib.urlencode(formdata)
-        response = opener.open("https://bbs.sjtu.edu.cn/bbslogin", data_encoded)
-        content = response.read()
-    except:
-        opener = urllib2.build_opener()
-    return opener
+def build_opener():
+    return urllib2.build_opener()
 
-openner = None
+
+opener = None
 
 
 def fetch(url, timeout):
@@ -131,10 +119,10 @@ def fetch(url, timeout):
     在SAE上採用Memcached，在本地測試時採用Redis。
     雖然Memcached支持更複雜的數據結構，不過Redis只支持字符串的存取，所以統一使用字符串。
     '''
-    global openner
+    global opener
     now = datetime2str(str2datetime(datetime2str(datetime.datetime.now())))
-    if openner is None:
-        openner = login_opener()
+    if opener is None:
+        opener = build_opener()
     if timeout > 0 and hasattr(g, 'mc'):
         result = g.mc.get(url.encode('ascii'))
         if result:
@@ -144,14 +132,14 @@ def fetch(url, timeout):
                 expired = (str2datetime(now) - result_time) > datetime.timedelta(seconds=timeout)
                 if not expired:
                     return (result, datetime2str(result_time))
-        html = openner.open(URLBASE + url).read().decode("gbk", "ignore")
+        html = opener.open(URLBASE + url).read().decode("gbk", "ignore")
         if result == html and result_time is not None:
             return (result, datetime2str(result_time))
         g.mc.set(url.encode('ascii'), html.encode("gbk", "ignore"))
         g.mc.set('time'+url.encode('ascii'), now)
         return (html, now)
     else:
-        return (openner.open(URLBASE + url).read().decode("gbk", "ignore"),
+        return (opener.open(URLBASE + url).read().decode("gbk", "ignore"),
                 datetime2str(datetime.datetime.now()))
 
 
@@ -170,7 +158,7 @@ def teardown_request(exception):
         g.db.close()
 
 
-@app.route('/')
+@app.route('/api')
 def hello():
     html = u"""
         <p>欢迎使用pyssy工具。</p>
@@ -179,18 +167,6 @@ def hello():
         <p> REDIS_MC %s </p>
         """ % REDIS_MC
     return render_template('template.html',body=html)
-
-
-@app.route("/login")
-def logintest():
-    cj = CookieJar()
-    opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
-    # input-type values from the html form
-    formdata = {"id": USERNAME, "pw": PASSWORD}
-    data_encoded = urllib.urlencode(formdata)
-    response = opener.open("https://bbs.sjtu.edu.cn/bbslogin", data_encoded)
-    content = response.read()
-    return content
 
 
 def soupdump(var):
@@ -902,64 +878,6 @@ def tree(url):
     #return '<br/>'.join(ans)
     return render_template('treeyssy.html',treehtml = treehtml(threads[0]),thread = thread_json, time = end - start)
 
-
-
-
-@app.route(u"/bmreason")
-def bmreason():
-    from time import clock
-    start=clock()
-    
-    url = 'bbstfind0?board=BMhome&reid=1333553593'
-    thread_json,xl = thread(url=url, format=u'raw', callback=u'', pretty=False)
-    threads = {}
-    index = 0
-    for art in thread_json[u'articles']:
-        art_json,xl = article(url=art[u'link'], format=u'raw', callback=u'', pretty=False)
-        text = ''.join(art_json['content']['text_lines'])
-        text = ''.join(BS(text).findAll(text = True))
-        names = set( x.lower() for x in filter(
-            lambda userid:not ('error' in user(url=('bbsqry?userid=%s'%userid), format=u'raw')[0])
-            ,re.findall('[a-zA-Z]+',text)))
-
-        author = art_json['content']['author']
-        if author in threads:
-            threads[author].update(names)
-        else:
-            threads[author] = names
-
-    end=clock()
-
-    results = {}
-    for x in threads:
-        if len(threads[x]) != 0:
-            results[x] = threads[x]
-
-    return '\n'.join('%s:%s'%(x,','.join(results[x])) for x in results)
-
-
-@app.route("/ebm")
-def bestbm():
-    fp, lp = 826, 1028
-
-    allpages = []
-    for page in xrange(fp, lp+1):
-        boardpage = board(url="bbsdoc?board=BMLogs&page="+str(page), pretty=1, format="raw")[0]
-        d3arts = [x for x in boardpage["articles"] if x["title"].endswith(u"3区昨日板务操作记录")]
-        allpages.extend(d3arts)
-    return "<pre>%s</pre>" % (
-        json.dumps(allpages, ensure_ascii=False, sort_keys=True, indent=4))
-
-@app.route("/ebmall")
-def ebmall():
-    alllinks  = open("links.txt").read().split("\n")
-    result = []
-    for link in alllinks:
-        if link.strip() == "":
-            continue
-        art = article(url=link, format="raw")[0]["content"]
-        result.append("\n".join(art["text_lines"][2:]))
-    return "<pre>%s</pre>" % "\n".join(result)
 
 if __name__ == '__main__':
     app.run()
