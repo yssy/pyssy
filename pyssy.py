@@ -382,7 +382,7 @@ def article(soup):
     
     qmd_index = -1
     for i in range(len(content_lines)-1,-1,-1):
-        if content_lines[i] == u'--':
+        if content_lines[i] == u'--' or content_lines[i] == u'</font>--':
             qmd_index = i
             break
     if qmd_index != -1:
@@ -398,7 +398,7 @@ def article(soup):
     if reply_index == -1:
         reply_index = qmd_index
     if reply_index != -1:
-        reply_lines = content_lines[reply_index : qmd_index - 1] 
+        reply_lines = content_lines[reply_index : qmd_index] 
         for i in range(1,len(reply_lines)):
             if len(re.findall(u'<font color="808080">: (.*)$',reply_lines[i])) > 0:
                 reply_lines[i] = re.findall(
@@ -685,6 +685,8 @@ def api_thread():
         board = request.values[u'board']
         url = u'bbstfind0?board=%s&reid=%s'%(board, reid)
     url = url[url.rfind(u'/') + 1:]
+    if 'full' in request.values:
+        return fullthread(url=url)
     return thread(url=url)
 
 
@@ -726,6 +728,33 @@ def thread(soup):
     result[u'board_link'] = center[7][u'href']
     result[u'bbstcon_link'] = center[9][u'href']
     return (result,{'datetime_tuple':'int','articles':'article'})
+
+@api(2)
+def fullthread(soup):
+        result = {}
+        center = soup.center.contents
+
+        result[u'page_title'] = center[0]
+        headline = center[1]
+        result[u'board'] = re.findall(u'\[讨论区: (.+?)\]', headline)[0]
+        result[u'topic'] = re.findall(u" \[主题 '(.+?)'\]", headline)[0]
+
+        trs = soup.table(u'tr')[1:]
+        result['articles'] = []
+        for tr in trs:
+                cont = tr.contents
+                datetime_str = cont[2].string
+                current_year = unicode(datetime.datetime.now().year)+datetime_str
+                datetime_ = datetime.datetime.strptime(current_year, u'%Y%b %d')
+                link = cont[3].a[u'href']
+                board = re.findall(u'board=(.+?)&', link)[0]
+                file_ = re.findall(u'file=(.+)$', link)[0]
+                result['articles'].append(article(url=link, format='raw')[0])
+        result[u'count'] = int(re.findall(u'共找到 ([0-9]+) 篇',center[6])[0])
+        result[u'board_link'] = center[7][u'href']
+        result[u'bbstcon_link'] = center[9][u'href']
+
+        return (result,{'datetime_tuple':'int','articles':'article'})
 
 
 @app.route(u'/api/bbsall.jsonp', methods=[u'GET', u'POST'])
