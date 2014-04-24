@@ -558,14 +558,13 @@ def board(soup):
         datetime_ = datetime.datetime.strptime(current_year,'%Y%b %d %H:%M')
         
         tit = art_list[4].a
-        if tit.font != None:
-            if tit.font['class']: # 标题有颜色
-                tit = list(tit.strings)[1]
-            else: # 有不可re属性
-                cannot_re = tit.font['color']
-                tit = list(tit.strings)[1]
+        if tit.font is None: # 普通标题
+            cannot_re = ''
         else:
             cannot_re = ''
+            if tit.font.u: # 不可re
+                cannot_re = tit.font['color']
+            tit = list(tit.strings)[1]
 
         article = {
             #u'list': [unicode(x) for x in art_list],
